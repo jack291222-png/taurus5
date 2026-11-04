@@ -74,7 +74,8 @@ A feature is a directory in its layer holding everything about one area of the a
 Shared:
 
     AdBlock/      EeveeSpotify's ad blocking: the ad and upsell services silenced (AdServices.x), ad components out of the
-                  Hub JSON (AdHubs.x) and the feeds (Feeds.m), Premium pop-ups dropped (AdPopups.x), and the responses
+                  Hub JSON (AdHubs.x) and the feeds (Feeds.m), Premium pop-ups dropped (AdPopups.x), the Premium badge taken
+                  off the Jam row of the new playlist sheet (AdBadges.x), and the responses
                   rewritten on the way in (AdNetwork.x, Premium.m over the protobuf walker in Protobuf.m), with crossfade
                   and automix switched on in the player core and crossfade's switch kept in step with its slider (Crossfade.x)
     Privacy/      telemetry blocking and its counters
@@ -345,7 +346,9 @@ logs are not shared unless the user explicitly chooses Copy or Share.
 ## Mod Settings
 
 Mod Settings, opened by holding Home on the tab bar or from the
-last row of Spotify's Settings, sorts every
+last row of Spotify's Settings (the drawer itself carries no row of the mod's; its plan badge is only
+recoloured and given the mod's words, put right the moment the drawer opens or the badge's text is set so
+a Premium account never shows Spotify Free), sorts every
 setting by the part of Spotify it changes, so a part's glass, its hide switches and its flags sit on
 one page, the mod's own rows first and Spotify's flags below them or on a sub page named after what
 they change. It opens on the Appearance card: Redesigned UI, then the stored look's accent colour, and in the native

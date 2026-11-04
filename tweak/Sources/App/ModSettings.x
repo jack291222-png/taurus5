@@ -279,7 +279,6 @@ static UIViewController *modSettingsPage(void) {
 #pragma mark - row in the settings list
 
 @interface SGModSettingsRow : UIControl
-@property (nonatomic) BOOL drawer;
 @end
 
 @implementation SGModSettingsRow {
@@ -303,11 +302,10 @@ static UIViewController *modSettingsPage(void) {
 - (void)layoutSubviews {
     [super layoutSubviews];
     _title.font = SGTitleFont();
-    CGFloat width = self.bounds.size.width, height = self.bounds.size.height, lead = self.drawer ? 4 : 0;
-    _icon.frame = CGRectMake(12 + lead, (height - 24) / 2, 24, 24);
-    _title.frame = CGRectMake(48 + lead, 0, width - 96, height);
+    CGFloat width = self.bounds.size.width, height = self.bounds.size.height;
+    _icon.frame = CGRectMake(12, (height - 24) / 2, 24, 24);
+    _title.frame = CGRectMake(48, 0, width - 96, height);
     _chevron.frame = CGRectMake(width - 24, (height - 12) / 2, 12, 12);
-    _chevron.hidden = self.drawer;
 }
 
 - (void)setHighlighted:(BOOL)highlighted {
@@ -329,13 +327,6 @@ static UINavigationController *navigationIn(UIViewController *page) {
     for (UIResponder *r = self; r && !owner; r = r.nextResponder) {
         if ([r isKindOfClass:UIViewController.class]) owner = (UIViewController *)r;
     }
-    UIViewController *presenting = self.drawer ? owner.presentingViewController : nil;
-    if (presenting) {
-        [presenting dismissViewControllerAnimated:YES completion:^{
-            SGShowPage(navigationIn(presenting).topViewController ?: presenting, modSettingsPage());
-        }];
-        return;
-    }
     SGShowPage(owner, modSettingsPage());
 }
 
@@ -355,23 +346,21 @@ void SGOpenModSettings(UIView *source) {
 static void placeRow(UICollectionView *list, SGModSettingsRow *row) {
     SGAdoptFonts(list, row);
     CGFloat bottom = list.contentSize.height;
-    row.hidden = !row.drawer && bottom <= 0;
-    row.frame = CGRectMake(0, row.drawer ? -kRowHeight : bottom, list.bounds.size.width, kRowHeight);
+    row.hidden = bottom <= 0;
+    row.frame = CGRectMake(0, bottom, list.bounds.size.width, kRowHeight);
 
     UIEdgeInsets inset = list.contentInset;
     NSValue *applied = objc_getAssociatedObject(list, &kInsetKey);
     if (applied && UIEdgeInsetsEqualToEdgeInsets(inset, applied.UIEdgeInsetsValue)) return;
-    if (row.drawer) inset.top += kRowHeight;
-    else inset.bottom += kRowHeight;
+    inset.bottom += kRowHeight;
     objc_setAssociatedObject(list, &kInsetKey, [NSValue valueWithUIEdgeInsets:inset], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     list.contentInset = inset;
 }
 
-static SGModSettingsRow *ensureDrawerRow(UICollectionView *list) {
+static SGModSettingsRow *ensureSettingsRow(UICollectionView *list) {
     SGModSettingsRow *row = objc_getAssociatedObject(list, &kRowKey);
     if (!row) {
         row = [[SGModSettingsRow alloc] initWithFrame:CGRectZero];
-        row.drawer = YES;
         objc_setAssociatedObject(list, &kRowKey, row, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     if (row.superview != list) [list addSubview:row];
@@ -408,9 +397,7 @@ static BOOL isSettingsRoot(UIViewController *list) {
             continue;
         }
         if (row) continue;
-        row = [[SGModSettingsRow alloc] initWithFrame:CGRectZero];
-        objc_setAssociatedObject(sub, &kRowKey, row, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        [sub addSubview:row];
+        ensureSettingsRow((UICollectionView *)sub);
     }
 }
 %end
@@ -432,8 +419,12 @@ static NSString *sidebarBadgeText(void) {
     return text.length ? text : @"Individual";
 }
 
-static BOOL isSidebarBadgeText(NSString *text) {
-    return [text isEqualToString:@"Spotify Free"] || [text isEqualToString:@"Taurine"]
+// Spotify's own words for the drawer's badge, before the mod has had a say. "Spotify Free" is what it says
+// for a moment while the account loads, on a Premium one too, so it is restyled rather than left alone.
+static BOOL isBadgeText(NSString *text) {
+    return [text isEqualToString:@"Spotify Free"] || [text isEqualToString:@"Spotify Premium"]
+        || [text isEqualToString:@"Individual"] || [text isEqualToString:@"Premium"]
+        || [text isEqualToString:@"Free"] || [text isEqualToString:@"Student"] || [text isEqualToString:@"Taurine"]
         || [text isEqualToString:@"Taurus"] || [text isEqualToString:sidebarBadgeText()];
 }
 
@@ -446,21 +437,36 @@ static BOOL isDrawerBadgeLabel(UILabel *label) {
 }
 
 static BOOL isPlanBadgeLabel(UILabel *label) {
-    return objc_getAssociatedObject(label, &kPlanBadgeLabelKey) != nil || isSidebarBadgeText(label.text);
+    return objc_getAssociatedObject(label, &kPlanBadgeLabelKey) != nil || isBadgeText(label.text);
 }
 
+// Puts the badge on its colour with the mod's words, even before it has a frame: the corner is worked out
+// again when it has one, by the UILabel hook below.
 static void stylePlanBadgeLabel(UILabel *label) {
     UIColor *color = planBadgeColor();
     CGFloat red = 0, green = 0, blue = 0, alpha = 0;
     [color getRed:&red green:&green blue:&blue alpha:&alpha];
     NSString *text = sidebarBadgeText();
     if (![label.text isEqualToString:text]) label.text = text;
-    label.textColor = (0.2126 * red + 0.7152 * green + 0.0722 * blue) > 0.55 ? UIColor.blackColor : UIColor.whiteColor;
+    UIColor *foreground = (0.2126 * red + 0.7152 * green + 0.0722 * blue) > 0.55 ? UIColor.blackColor : UIColor.whiteColor;
+    label.textColor = foreground;
+    // A badge whose words are set as attributed text keeps its font and takes the colour on top; the colour
+    // is left alone once it is right, so the pass this starts ends there.
+    NSMutableAttributedString *attributed = [label.attributedText mutableCopy];
+    if (attributed.length) {
+        UIColor *current = [attributed attribute:NSForegroundColorAttributeName atIndex:0 effectiveRange:NULL];
+        if (!current || !CGColorEqualToColor(current.CGColor, foreground.CGColor)) {
+            [attributed addAttribute:NSForegroundColorAttributeName value:foreground range:NSMakeRange(0, attributed.length)];
+            label.attributedText = attributed;
+        }
+    }
     label.backgroundColor = color;
     label.layer.backgroundColor = color.CGColor;
     label.layer.cornerRadius = MIN(8, CGRectGetHeight(label.bounds) / 2);
     label.clipsToBounds = YES;
     objc_setAssociatedObject(label, &kPlanBadgeLabelKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    // Reached from -setText: below, which runs this once more; that second pass finds the words right and
+    // only sets the colours, so it ends there.
 
     CGRect labelBounds = label.bounds;
     for (UIView *badge = label.superview; badge && badge != sg_drawerRoot; badge = badge.superview) {
@@ -483,41 +489,59 @@ static void updatePlanBadge(UIView *root) {
     });
 }
 
+// Every label is watched: the drawer's badge is found before it has its words, its frame or its place, and
+// Spotify sets them all after it is made. Outside the drawer nothing is touched.
 %hook UILabel
 - (void)setText:(NSString *)text {
     %orig;
-    if (![text isEqualToString:@"Spotify Free"] && ![text isEqualToString:@"Taurine"] &&
-        ![text isEqualToString:@"Taurus"]) return;
+    if (text.length < 1 || text.length > 32) return;
     if (!isDrawerBadgeLabel(self)) return;
+    if (objc_getAssociatedObject(self, &kPlanBadgeLabelKey) == nil && !isBadgeText(text)) return;
     stylePlanBadgeLabel(self);
+}
+
+- (void)setAttributedText:(NSAttributedString *)text {
+    %orig;
+    if (text.length < 1 || text.length > 32) return;
+    if (!isDrawerBadgeLabel(self)) return;
+    if (objc_getAssociatedObject(self, &kPlanBadgeLabelKey) == nil && !isBadgeText(self.text)) return;
+    stylePlanBadgeLabel(self);
+}
+
+- (void)layoutSubviews {
+    %orig;
+    if (objc_getAssociatedObject(self, &kPlanBadgeLabelKey) == nil) return;
+    CGFloat corner = MIN(8, CGRectGetHeight(self.bounds) / 2);
+    if (self.layer.cornerRadius != corner) self.layer.cornerRadius = corner;
 }
 %end
 
-// Keep the drawer's plan badge and the Taurus settings row current as Spotify rebuilds its view.
+// Keep the drawer's plan badge current as Spotify rebuilds its view, and put it right whenever the drawer is
+// opened: its labels are made before the account has answered, so a first pass alone can leave "Spotify Free".
 %hook _TtC23SideDrawer_ListPageImpl18ListViewController
 - (void)viewDidLayoutSubviews {
     %orig;
     sg_drawerRoot = ((UIViewController *)self).view;
     updatePlanBadge(sg_drawerRoot);
-    SGForEachView(sg_drawerRoot, ^(UIView *view) {
-        if (![view isKindOfClass:UICollectionView.class] ||
-            ![NSStringFromClass(view.class) containsString:@"SideDrawerListCollectionView"]) return;
-        ensureDrawerRow((UICollectionView *)view);
-    });
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    sg_drawerRoot = ((UIViewController *)self).view;
+    updatePlanBadge(sg_drawerRoot);
 }
 %end
 
-// The lists lay out after their controllers and again whenever their content changes.
+// The lists lay out after their controllers and again whenever their content changes. Only a list that already
+// has the settings row (the hook above puts it on Spotify's Settings list) is given it here.
 %hook UICollectionView
 - (void)layoutSubviews {
     %orig;
+    if ([NSStringFromClass(self.class) containsString:@"SideDrawerListCollectionView"]) updatePlanBadge(self);
     SGModSettingsRow *row = objc_getAssociatedObject(self, &kRowKey);
-    BOOL drawerList = [NSStringFromClass(self.class) containsString:@"SideDrawerListCollectionView"];
-    if (drawerList) updatePlanBadge(self);
-    if (!row && drawerList)
-        row = ensureDrawerRow(self);
-    if (row && row.superview != self) [self addSubview:row];
-    if (row) placeRow(self, row);
+    if (!row) return;
+    if (row.superview != self) [self addSubview:row];
+    placeRow(self, row);
 }
 %end
 
