@@ -1,5 +1,6 @@
 #import "IndividualPlan.h"
 #import "Settings/SGPage.h"
+#import "Settings/SGPageStyle.h"
 #import "Core/SGCore.h"
 #import <objc/runtime.h>
 
@@ -42,10 +43,13 @@ static UILabel *SGPlanText(NSString *text, CGFloat size, UIFontWeight weight, UI
 }
 - (UIButton *)outlineButton:(NSString *)title action:(SEL)action {
     UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
-    [button setTitle:title forState:UIControlStateNormal];
-    [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-    button.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightBold];
-    button.contentEdgeInsets = UIEdgeInsetsMake(12, 20, 12, 20);
+    UIButtonConfiguration *configuration = [UIButtonConfiguration plainButtonConfiguration];
+    configuration.attributedTitle = [[NSAttributedString alloc] initWithString:title attributes:@{
+        NSFontAttributeName: [UIFont systemFontOfSize:16 weight:UIFontWeightBold]
+    }];
+    configuration.baseForegroundColor = UIColor.whiteColor;
+    configuration.contentInsets = NSDirectionalEdgeInsetsMake(12, 20, 12, 20);
+    button.configuration = configuration;
     button.layer.borderWidth = 1;
     button.layer.borderColor = [UIColor colorWithWhite:0.55 alpha:1].CGColor;
     button.layer.cornerRadius = 24;
