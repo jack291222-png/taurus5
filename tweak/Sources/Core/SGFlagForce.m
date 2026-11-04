@@ -66,3 +66,31 @@ id SGLockedFlagValue(NSString *key, BOOL *beatsOverride) {
     }
     return nil;
 }
+// Force Spotify subscription and product flags synchronously to eliminate Free -> Individual flicker
+__attribute__((constructor)) static void taurusForceSubscriptionFlags() {
+    SGRegisterFlagForcer(YES, ^id(NSString *key) {
+        if ([key isEqualToString:@"product"] || 
+            [key isEqualToString:@"subscription-tier"] || 
+            [key isEqualToString:@"type"]) {
+            return @"individual";
+        }
+        if ([key isEqualToString:@"is-premium"] || 
+            [key isEqualToString:@"premium"] || 
+            [key isEqualToString:@"has-premium"]) {
+            return @YES;
+        }
+        return nil;
+    }, ^id(NSString *key) {
+        if ([key isEqualToString:@"product"] || 
+            [key isEqualToString:@"subscription-tier"] || 
+            [key isEqualToString:@"type"]) {
+            return @"individual";
+        }
+        if ([key isEqualToString:@"is-premium"] || 
+            [key isEqualToString:@"premium"] || 
+            [key isEqualToString:@"has-premium"]) {
+            return @YES;
+        }
+        return nil;
+    });
+}
