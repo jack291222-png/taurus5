@@ -2,7 +2,7 @@
 
 // Search the complete create-menu ancestor, not a fixed-height sheet: Spotify
 // can put the four rows in separate cells under a full-screen container.
-static BOOL SGIsBlockedJamTouch(UIView *hit, UIWindow *window, CGPoint point) {
+static BOOL SGIsBlockedJamTouch(UIView *hit, UIWindow *window, CGPoint point, CGRect *targetRect) {
     for (UIView *view = hit; view && view != window; view = view.superview) {
         __block BOOL playlist = NO, blend = NO;
         __block UILabel *jam = nil;
@@ -25,16 +25,44 @@ static BOOL SGIsBlockedJamTouch(UIView *hit, UIWindow *window, CGPoint point) {
         CGRect title = [jam convertRect:jam.bounds toView:window];
         rect = CGRectUnion(rect, CGRectMake(0, CGRectGetMinY(title) - 16,
                                          window.bounds.size.width, title.size.height + 56));
-        return CGRectContainsPoint(rect, point);
+        if (!CGRectContainsPoint(rect, point)) return NO;
+        CGRect menu = [view convertRect:view.bounds toView:window];
+        *targetRect = CGRectIntersection(rect, menu);
+        return YES;
     }
     return NO;
 }
 
+// A window-owned no-action button receives the touch, outside Spotify's row
+// recognizers. It still tracks a held finger and supplies the requested feedback.
+@interface SGJamPressButton : UIButton
+@end
+@implementation SGJamPressButton
+- (void)setHighlighted:(BOOL)highlighted {
+    [super setHighlighted:highlighted];
+    self.backgroundColor = highlighted ? [UIColor colorWithWhite:0 alpha:0.35] : UIColor.clearColor;
+}
+@end
+static char kJamPressButtonKey;
+
 %hook UIWindow
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    SGJamPressButton *button = objc_getAssociatedObject(self, &kJamPressButtonKey);
+    [button removeFromSuperview];
     UIView *hit = %orig;
-    if (hit && SGIsBlockedJamTouch(hit, self, point)) return self;
-    return hit;
+    CGRect row = CGRectZero;
+    if (!hit || !SGIsBlockedJamTouch(hit, self, point, &row)) return hit;
+    if (!button) {
+        button = [SGJamPressButton buttonWithType:UIButtonTypeCustom];
+        button.accessibilityLabel = @"Jam";
+        button.accessibilityHint = @"No action";
+        button.layer.cornerRadius = 12;
+        button.clipsToBounds = YES;
+        objc_setAssociatedObject(self, &kJamPressButtonKey, button, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    button.frame = CGRectInset(row, 4, 0);
+    [self addSubview:button];
+    return button;
 }
 %end
 

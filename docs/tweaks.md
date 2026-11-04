@@ -495,3 +495,12 @@ possible; Jam upsells are blocked independently. Plan touches use a window-owned
 button to avoid collection-row recognizers cancelling the original content-view
 button. Badge layout reapplies the complete style and removes attributed text
 background colors even when the foreground color is already correct.
+
+The create-menu Jam interceptor now returns a window-owned no-action UIButton,
+not the window itself. The button supplies a dark rounded highlighted state
+while held; it has no navigation target. The drawer's Individual badge uses a
+single padded rounded-rectangle surface (6pt corners, black text, green accent),
+positioned over the outer compact Spotify badge. The original compact badge is
+alpha-zeroed, preserving stack layout while removing its gray backing and tight
+text-only green shape. The replacement label is excluded from badge discovery
+to avoid recursive overlays. The plan page itself is unchanged in this follow-up.

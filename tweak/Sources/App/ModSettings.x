@@ -413,6 +413,13 @@ static UIColor *planBadgeColor(void) {
                             blue:(rgb & 0xFF) / 255.0 alpha:1];
 }
 
+// Own the complete badge surface instead of coloring a tight text glyph box.
+@interface SGIndividualBadgeLabel : UILabel
+@end
+@implementation SGIndividualBadgeLabel
+@end
+static char kIndividualBadgeSurfaceKey;
+
 static __weak UIView *sg_drawerRoot;
 static char kPlanBadgeLabelKey;
 
@@ -430,6 +437,7 @@ static BOOL isBadgeText(NSString *text) {
 }
 
 static BOOL isDrawerBadgeLabel(UILabel *label) {
+    if ([label isKindOfClass:SGIndividualBadgeLabel.class]) return NO;
     for (UIView *view = label; view; view = view.superview) {
         if (view == sg_drawerRoot ||
             [NSStringFromClass(view.class) containsString:@"SideDrawerListCollectionView"]) return YES;
@@ -444,51 +452,45 @@ static BOOL isPlanBadgeLabel(UILabel *label) {
 // Puts the badge on its colour with the mod's words, even before it has a frame: the corner is worked out
 // again when it has one, by the UILabel hook below.
 static void stylePlanBadgeLabel(UILabel *label) {
-    UIColor *color = planBadgeColor();
-    CGFloat red = 0, green = 0, blue = 0, alpha = 0;
-    [color getRed:&red green:&green blue:&blue alpha:&alpha];
     objc_setAssociatedObject(label, &kPlanBadgeLabelKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    NSString *text = sidebarBadgeText();
-    if (![label.text isEqualToString:text]) label.text = text;
-    UIColor *foreground = (0.2126 * red + 0.7152 * green + 0.0722 * blue) > 0.55 ? UIColor.blackColor : UIColor.whiteColor;
-    label.textColor = foreground;
-    // A badge whose words are set as attributed text keeps its font and takes the colour on top; the colour
-    // is left alone once it is right, so the pass this starts ends there.
-    NSMutableAttributedString *attributed = [label.attributedText mutableCopy];
-    if (attributed.length) {
-        UIColor *current = [attributed attribute:NSForegroundColorAttributeName atIndex:0 effectiveRange:NULL];
-        if (!current || !CGColorEqualToColor(current.CGColor, foreground.CGColor) ||
-            [attributed attribute:NSBackgroundColorAttributeName atIndex:0 effectiveRange:NULL]) {
-            [attributed removeAttribute:NSBackgroundColorAttributeName range:NSMakeRange(0, attributed.length)];
-            [attributed addAttribute:NSForegroundColorAttributeName value:foreground range:NSMakeRange(0, attributed.length)];
-            label.attributedText = attributed;
-        }
+    if (![label.text isEqualToString:@"Individual"]) label.text = @"Individual";
+    // Find the outer compact badge, stopping well before the full drawer row.
+    UIView *host = label;
+    for (UIView *v = label.superview; v && v != sg_drawerRoot; v = v.superview) {
+        if (v.bounds.size.height > 48 || v.bounds.size.width > 220) break;
+        host = v;
     }
-    label.backgroundColor = color;
-    label.layer.backgroundColor = color.CGColor;
-    label.layer.cornerRadius = MIN(8, CGRectGetHeight(label.bounds) / 2);
-    label.clipsToBounds = YES;
-    objc_setAssociatedObject(label, &kPlanBadgeLabelKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    // Reached from -setText: below, which runs this once more; that second pass finds the words right and
-    // only sets the colours, so it ends there.
-
-    CGRect labelBounds = label.bounds;
-    for (UIView *badge = label.superview; badge && badge != sg_drawerRoot; badge = badge.superview) {
-        CGRect labelFrame = [label convertRect:labelBounds toView:badge];
-        if (badge.bounds.size.width > CGRectGetWidth(labelFrame) + 80 ||
-            badge.bounds.size.height > CGRectGetHeight(labelFrame) + 32) break;
-        // Only the text label draws the pill; clear Spotify's gray backing.
-        badge.backgroundColor = UIColor.clearColor;
-        badge.layer.backgroundColor = UIColor.clearColor.CGColor;
-        badge.layer.cornerRadius = MIN(8, CGRectGetHeight(badge.bounds) / 2);
-        badge.layer.masksToBounds = YES;
+    if (!host.superview || host.bounds.size.width < 1 || host.bounds.size.height < 1) return;
+    SGIndividualBadgeLabel *surface = objc_getAssociatedObject(label, &kIndividualBadgeSurfaceKey);
+    if (!surface) {
+        surface = [SGIndividualBadgeLabel new];
+        surface.text = @"Individual";
+        surface.textAlignment = NSTextAlignmentCenter;
+        surface.userInteractionEnabled = NO;
+        surface.isAccessibilityElement = NO; // The original plan row remains accessible.
+        objc_setAssociatedObject(label, &kIndividualBadgeSurfaceKey, surface, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
+    surface.font = label.font ?: [UIFont boldSystemFontOfSize:16];
+    surface.textColor = UIColor.blackColor;
+    surface.backgroundColor = planBadgeColor();
+    surface.layer.cornerRadius = 6;
+    surface.clipsToBounds = YES;
+    CGFloat width = ceil([surface.text sizeWithAttributes:@{NSFontAttributeName:surface.font}].width) + 24;
+    CGFloat height = MAX(32, ceil(surface.font.lineHeight) + 12);
+    CGRect rect = host.frame;
+    surface.frame = CGRectMake(CGRectGetMaxX(rect) - width, CGRectGetMidY(rect) - height / 2, width, height);
+    // Alpha leaves Spotify's Encore stack layout intact. Replacing the whole
+    // surface also removes sibling/background gray layers, not just ancestors.
+    host.alpha = 0;
+    if (surface.superview != host.superview) [host.superview addSubview:surface];
+    [host.superview bringSubviewToFront:surface];
 }
 
 static void updatePlanBadge(UIView *root) {
     SGForEachView(root, ^(UIView *view) {
         if (![view isKindOfClass:UILabel.class]) return;
         UILabel *label = (UILabel *)view;
+        if ([label isKindOfClass:SGIndividualBadgeLabel.class]) return;
         BOOL planTitle = [label.text isEqualToString:@"Your plan"];
         BOOL badge = isPlanBadgeLabel(label);
         if (!planTitle && !badge) return;
