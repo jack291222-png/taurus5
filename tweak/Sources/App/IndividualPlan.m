@@ -87,6 +87,7 @@ UIViewController *SGIndividualPlanPage(void) { return [SGIndividualPlanPageContr
     for (UIResponder *r = self.nextResponder; r; r = r.nextResponder) {
         if ([r isKindOfClass:UIViewController.class]) { owner = (UIViewController *)r; break; }
     }
+    owner = owner ?: SGTopController();
     if (owner && !owner.presentedViewController) SGShowPage(owner, SGIndividualPlanPage());
 }
 @end
@@ -102,4 +103,32 @@ void SGInstallPlanButton(UIView *row) {
     }
     button.frame = row.bounds;
     [row bringSubviewToFront:button];
+}
+
+static char SGWindowPlanButtonKey;
+void SGClearPlanTouch(UIWindow *window) {
+    [objc_getAssociatedObject(window, &SGWindowPlanButtonKey) removeFromSuperview];
+}
+UIView *SGRoutePlanTouch(UIWindow *window, CGPoint point, UIView *hit) {
+    BOOL drawer = NO;
+    for (UIView *v = hit; v; v = v.superview) {
+        if ([NSStringFromClass(v.class) containsString:@"SideDrawer"]) drawer = YES;
+    }
+    if (!drawer) return hit;
+    for (UIView *row = hit; row && row != window; row = row.superview) {
+        if (row.bounds.size.height > 140) break;
+        __block BOOL plan = NO;
+        SGForEachView(row, ^(UIView *v) {
+            if ([v isKindOfClass:UILabel.class] &&
+                [((UILabel *)v).text isEqualToString:@"Your plan"]) plan = YES;
+        });
+        if (!plan) continue;
+        SGPlanButton *button = objc_getAssociatedObject(window, &SGWindowPlanButtonKey);
+        if (!button) button = [[SGPlanButton alloc] initWithFrame:CGRectZero];
+        button.frame = [row convertRect:row.bounds toView:window];
+        objc_setAssociatedObject(window, &SGWindowPlanButtonKey, button, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [window addSubview:button];
+        return button;
+    }
+    return hit;
 }

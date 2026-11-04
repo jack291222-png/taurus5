@@ -485,3 +485,13 @@ not the original row or its gesture recognizers. Your Premium is also available
 in Mod Settings, since a blocked profile button cannot open the drawer.
 The drawer badge now always uses Individual, preserves that text on empty account
 updates, and clears small backing containers rather than painting an extra box.
+
+Follow-up to the entry-point fallback: Jam matching now walks beyond the old
+180–500pt sheet limit, to support separately hosted rows. A presentation guard
+also rejects runtime controller families containing both Jam and Upsell. This
+runtime-name fallback needs device confirmation; it is not proof of a private
+selector. Profile taps are no longer disabled: opening the drawer must remain
+possible; Jam upsells are blocked independently. Plan touches use a window-owned
+button to avoid collection-row recognizers cancelling the original content-view
+button. Badge layout reapplies the complete style and removes attributed text
+background colors even when the foreground color is already correct.

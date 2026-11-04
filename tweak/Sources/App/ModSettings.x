@@ -457,7 +457,8 @@ static void stylePlanBadgeLabel(UILabel *label) {
     NSMutableAttributedString *attributed = [label.attributedText mutableCopy];
     if (attributed.length) {
         UIColor *current = [attributed attribute:NSForegroundColorAttributeName atIndex:0 effectiveRange:NULL];
-        if (!current || !CGColorEqualToColor(current.CGColor, foreground.CGColor)) {
+        if (!current || !CGColorEqualToColor(current.CGColor, foreground.CGColor) ||
+            [attributed attribute:NSBackgroundColorAttributeName atIndex:0 effectiveRange:NULL]) {
             [attributed removeAttribute:NSBackgroundColorAttributeName range:NSMakeRange(0, attributed.length)];
             [attributed addAttribute:NSForegroundColorAttributeName value:foreground range:NSMakeRange(0, attributed.length)];
             label.attributedText = attributed;
@@ -528,8 +529,16 @@ static void updatePlanBadge(UIView *root) {
 - (void)layoutSubviews {
     %orig;
     if (objc_getAssociatedObject(self, &kPlanBadgeLabelKey) == nil) return;
-    CGFloat corner = MIN(8, CGRectGetHeight(self.bounds) / 2);
-    if (self.layer.cornerRadius != corner) self.layer.cornerRadius = corner;
+    if (isDrawerBadgeLabel(self)) stylePlanBadgeLabel(self);
+}
+%end
+
+// A window-owned button avoids collection-cell tap recognizers cancelling the plan action.
+%hook UIWindow
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    SGClearPlanTouch(self);
+    UIView *hit = %orig;
+    return SGRoutePlanTouch(self, point, hit);
 }
 %end
 
