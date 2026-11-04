@@ -58,10 +58,11 @@ static UILabel *SGPlanText(NSString *text, CGFloat size, UIFontWeight weight, UI
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 2; }
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return 1; }
-- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section { return 72; }
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section { return section == 0 ? 24 : 72; }
 - (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
     UIView *header = [UIView new];
     header.backgroundColor = tableView.backgroundColor;
+    if (section == 0) return header;
     UILabel *title = SGPlanText(section == 0 ? @"Subscription" : @"Snapshot of your benefits", 22, UIFontWeightBold, UIColor.whiteColor);
     title.translatesAutoresizingMaskIntoConstraints = NO;
     [header addSubview:title];
@@ -78,6 +79,7 @@ static UILabel *SGPlanText(NSString *text, CGFloat size, UIFontWeight weight, UI
     UIView *card = [UIView new];
     card.backgroundColor = [UIColor colorWithWhite:0.125 alpha:1];
     card.layer.cornerRadius = 8;
+    card.clipsToBounds = YES;
     card.translatesAutoresizingMaskIntoConstraints = NO;
     [cell.contentView addSubview:card];
     UIStackView *stack = [UIStackView new];
@@ -92,10 +94,28 @@ static UILabel *SGPlanText(NSString *text, CGFloat size, UIFontWeight weight, UI
         [card.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor],
         [stack.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:20],
         [stack.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-20],
-        [stack.topAnchor constraintEqualToAnchor:card.topAnchor constant:24],
+        [stack.topAnchor constraintEqualToAnchor:card.topAnchor constant:(indexPath.section == 0 ? 64 : 24)],
         [stack.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-24]
     ]];
     if (indexPath.section == 0) {
+        UIView *tag = [UIView new];
+        tag.backgroundColor = [UIColor colorWithWhite:0.20 alpha:1];
+        tag.layer.cornerRadius = 8;
+        tag.layer.maskedCorners = kCALayerMaxXMaxYCorner;
+        tag.translatesAutoresizingMaskIntoConstraints = NO;
+        [card addSubview:tag];
+        UILabel *caption = SGPlanText(@"Subscription", 17, UIFontWeightBold, UIColor.whiteColor);
+        caption.translatesAutoresizingMaskIntoConstraints = NO;
+        [tag addSubview:caption];
+        [NSLayoutConstraint activateConstraints:@[
+            [tag.leadingAnchor constraintEqualToAnchor:card.leadingAnchor],
+            [tag.topAnchor constraintEqualToAnchor:card.topAnchor],
+            [caption.leadingAnchor constraintEqualToAnchor:tag.leadingAnchor constant:16],
+            [caption.trailingAnchor constraintEqualToAnchor:tag.trailingAnchor constant:-16],
+            [caption.topAnchor constraintEqualToAnchor:tag.topAnchor constant:8],
+            [caption.bottomAnchor constraintEqualToAnchor:tag.bottomAnchor constant:-8],
+            [tag.trailingAnchor constraintLessThanOrEqualToAnchor:card.trailingAnchor]
+        ]];
         [stack addArrangedSubview:SGPlanText(@"Premium", 18, UIFontWeightBold, UIColor.whiteColor)];
         UILabel *name = SGPlanText(@"Individual", 32, UIFontWeightBold, SGPlanGreen());
         [stack addArrangedSubview:name];

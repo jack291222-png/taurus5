@@ -2,7 +2,7 @@
 
 // Search the complete create-menu ancestor, not a fixed-height sheet: Spotify
 // can put the four rows in separate cells under a full-screen container.
-static BOOL SGIsBlockedJamTouch(UIView *hit, UIWindow *window, CGPoint point, CGRect *targetRect) {
+static BOOL SGIsBlockedJamTouch(UIView *hit, UIWindow *window, CGPoint point, CGRect *targetRect, UIView **feedbackRow) {
     for (UIView *view = hit; view && view != window; view = view.superview) {
         __block BOOL playlist = NO, blend = NO;
         __block UILabel *jam = nil;
@@ -28,6 +28,7 @@ static BOOL SGIsBlockedJamTouch(UIView *hit, UIWindow *window, CGPoint point, CG
         if (!CGRectContainsPoint(rect, point)) return NO;
         CGRect menu = [view convertRect:view.bounds toView:window];
         *targetRect = CGRectIntersection(rect, menu);
+        *feedbackRow = row;
         return YES;
     }
     return NO;
@@ -36,11 +37,16 @@ static BOOL SGIsBlockedJamTouch(UIView *hit, UIWindow *window, CGPoint point, CG
 // A window-owned no-action button receives the touch, outside Spotify's row
 // recognizers. It still tracks a held finger and supplies the requested feedback.
 @interface SGJamPressButton : UIButton
+@property(nonatomic, weak) UIView *feedbackRow;
+@property(nonatomic, strong) UIColor *restingColor;
+@property(nonatomic) CGFloat restingCorner;
 @end
 @implementation SGJamPressButton
 - (void)setHighlighted:(BOOL)highlighted {
     [super setHighlighted:highlighted];
-    self.backgroundColor = highlighted ? [UIColor colorWithWhite:0 alpha:0.35] : UIColor.clearColor;
+    // Paint behind Spotify's own icon and text, never over them.
+    self.feedbackRow.backgroundColor = highlighted ? UIColor.blackColor : self.restingColor;
+    self.feedbackRow.layer.cornerRadius = highlighted ? 16 : self.restingCorner;
 }
 @end
 static char kJamPressButtonKey;
@@ -48,10 +54,14 @@ static char kJamPressButtonKey;
 %hook UIWindow
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     SGJamPressButton *button = objc_getAssociatedObject(self, &kJamPressButtonKey);
+    // Repeated hit tests during tracking must not detach the active control.
+    if (button.isTracking && button.superview == self) return button;
+    [button setHighlighted:NO];
     [button removeFromSuperview];
     UIView *hit = %orig;
     CGRect row = CGRectZero;
-    if (!hit || !SGIsBlockedJamTouch(hit, self, point, &row)) return hit;
+    UIView *feedback = nil;
+    if (!hit || !SGIsBlockedJamTouch(hit, self, point, &row, &feedback)) return hit;
     if (!button) {
         button = [SGJamPressButton buttonWithType:UIButtonTypeCustom];
         button.accessibilityLabel = @"Jam";
@@ -60,6 +70,9 @@ static char kJamPressButtonKey;
         button.clipsToBounds = YES;
         objc_setAssociatedObject(self, &kJamPressButtonKey, button, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
+    button.feedbackRow = feedback;
+    button.restingColor = feedback.backgroundColor;
+    button.restingCorner = feedback.layer.cornerRadius;
     button.frame = CGRectInset(row, 4, 0);
     [self addSubview:button];
     return button;
