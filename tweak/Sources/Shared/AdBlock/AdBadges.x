@@ -56,23 +56,28 @@ static UIView *jamRowAround(UILabel *label) {
     return nil;
 }
 
-// The mark beside the word: a small view on the same line, not a label and holding no words of its own, so
-// the row's title and its glyph are left alone.
+// The mark beside the word: the small views on its line, just before it. Spotify's Encore label puts its words
+// in a UILabel of its own (id=...-internal, PlayerControls.x), so the word's line is asked for, and then the
+// line its own view is in; the row's title and its glyph are far wider than a mark, so they are left alone.
 static NSArray<UIView *> *partsOfBadge(UILabel *label) {
     NSMutableArray<UIView *> *parts = [NSMutableArray arrayWithObject:label];
-    UIView *line = label.superview;
-    if (!line || CGRectGetHeight(line.bounds) > 44) return parts;
-    CGRect word = [label convertRect:label.bounds toView:line];
-    for (UIView *sibling in line.subviews) {
-        if (sibling == label || [sibling isKindOfClass:UILabel.class]) continue;
-        // Small, and no more than a word's own width away: the mark is drawn in the two or three points before
-        // the word, where a row's artwork or its glyph would be much wider than this.
-        if (CGRectGetHeight(sibling.bounds) > 24 || CGRectGetWidth(sibling.bounds) > 28) continue;
-        CGRect part = [sibling convertRect:sibling.bounds toView:line];
-        if (CGRectGetMidY(part) < CGRectGetMinY(word) - 4 || CGRectGetMidY(part) > CGRectGetMaxY(word) + 4) continue;
-        if (CGRectGetMaxX(part) > CGRectGetMinX(word) + 2) continue;
-        if (CGRectGetMaxX(part) < CGRectGetMinX(word) - 28) continue;
-        [parts addObject:sibling];
+    UIView *anchor = label;
+    for (int up = 0; up < 2 && anchor; up++, anchor = anchor.superview) {
+        UIView *line = anchor.superview;
+        if (!line || CGRectGetHeight(line.bounds) > 44) break;
+        CGRect word = [anchor convertRect:anchor.bounds toView:line];
+        NSUInteger found = 0;
+        for (UIView *sibling in line.subviews) {
+            if (sibling == anchor || [sibling isKindOfClass:UILabel.class]) continue;
+            if (CGRectGetHeight(sibling.bounds) > 24 || CGRectGetWidth(sibling.bounds) > 28) continue;
+            CGRect part = [sibling convertRect:sibling.bounds toView:line];
+            if (CGRectGetMidY(part) < CGRectGetMinY(word) - 4 || CGRectGetMidY(part) > CGRectGetMaxY(word) + 4) continue;
+            if (CGRectGetMaxX(part) > CGRectGetMinX(word) + 2) continue;
+            if (CGRectGetMaxX(part) < CGRectGetMinX(word) - 28) continue;
+            [parts addObject:sibling];
+            found++;
+        }
+        if (found) break;
     }
     return parts;
 }
