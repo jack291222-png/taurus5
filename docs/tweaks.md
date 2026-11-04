@@ -514,3 +514,12 @@ The local-preview/account-availability note remains in the footer, outside the
 plan card. Student discounts, lossless access and billing/cancellation status
 are not invented. These are custom UIKit cards matching the reference layout,
 not a restoration of Spotify's private subscription view implementation.
+
+The screenshot-matched plan card places its gray Subscription tab inside the
+card's upper-left corner; the benefits list and audio-quality wording are kept.
+This remains a UIKit reconstruction, not Spotify's private native card class.
+Jam's no-action touch control now keeps the active control attached through
+repeated hit tests. Its highlight changes the underlying Spotify row background
+to black and restores its prior color/corner radius on release or cancellation;
+it does not draw a dark overlay over the original title and icon. On-device
+tracking and cancellation still need verification before merging.
