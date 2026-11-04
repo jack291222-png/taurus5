@@ -1357,3 +1357,13 @@ static void openWhenUp(SGRMenuSession *session, UIViewController *sheet, int tri
     %init;
     SGRequireClasses(@[kSheetClass]);
 }
+%hook SPTPremiumBadgeView
+- (void)setHidden:(BOOL)hidden {
+    %orig(YES);
+}
+- (void)didMoveToSuperview {
+    %orig;
+    self.hidden = YES;
+    [self removeFromSuperview];
+}
+%end
