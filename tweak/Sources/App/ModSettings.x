@@ -19,6 +19,7 @@
 #import "Shared/ListeningStats/ListeningStats.h"
 #import "App/About/About.h"
 #import "Pages.h"
+#import "IndividualPlan.h"
 
 static const CGFloat kRowHeight = 56;
 static char kRowKey, kInsetKey;
@@ -231,6 +232,7 @@ static UIViewController *modSettingsPage(void) {
     downloads.value = ^NSString *{ return SGDownloadsRowSummary(); };
     downloads.refreshOn = SGDownloadsDidChangeNotification;
     NSMutableArray<SGModRow *> *parts = [NSMutableArray arrayWithArray:@[
+        pageRow(@"Your Premium", @"person.fill", ^UIViewController *{ return SGIndividualPlanPage(); }),
         pageRow(@"Appearance", @"paintpalette", ^UIViewController *{ return SGAppearanceSettingsPage(); }),
         pageRow(@"Navbar", @"dock.rectangle", ^UIViewController *{ return SGNavbarPage(); }),
         pageRow(@"Player", @"play.circle", ^UIViewController *{ return SGPlayerSettingsPage(); }),
@@ -415,8 +417,7 @@ static __weak UIView *sg_drawerRoot;
 static char kPlanBadgeLabelKey;
 
 static NSString *sidebarBadgeText(void) {
-    NSString *text = [NSUserDefaults.standardUserDefaults stringForKey:SGKeySidebarBadgeText];
-    return text.length ? text : @"Individual";
+    return @"Individual";
 }
 
 // Spotify's own words for the drawer's badge, before the mod has had a say. "Spotify Free" is what it says
@@ -446,6 +447,7 @@ static void stylePlanBadgeLabel(UILabel *label) {
     UIColor *color = planBadgeColor();
     CGFloat red = 0, green = 0, blue = 0, alpha = 0;
     [color getRed:&red green:&green blue:&blue alpha:&alpha];
+    objc_setAssociatedObject(label, &kPlanBadgeLabelKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     NSString *text = sidebarBadgeText();
     if (![label.text isEqualToString:text]) label.text = text;
     UIColor *foreground = (0.2126 * red + 0.7152 * green + 0.0722 * blue) > 0.55 ? UIColor.blackColor : UIColor.whiteColor;
@@ -456,6 +458,7 @@ static void stylePlanBadgeLabel(UILabel *label) {
     if (attributed.length) {
         UIColor *current = [attributed attribute:NSForegroundColorAttributeName atIndex:0 effectiveRange:NULL];
         if (!current || !CGColorEqualToColor(current.CGColor, foreground.CGColor)) {
+            [attributed removeAttribute:NSBackgroundColorAttributeName range:NSMakeRange(0, attributed.length)];
             [attributed addAttribute:NSForegroundColorAttributeName value:foreground range:NSMakeRange(0, attributed.length)];
             label.attributedText = attributed;
         }
@@ -473,8 +476,9 @@ static void stylePlanBadgeLabel(UILabel *label) {
         CGRect labelFrame = [label convertRect:labelBounds toView:badge];
         if (badge.bounds.size.width > CGRectGetWidth(labelFrame) + 80 ||
             badge.bounds.size.height > CGRectGetHeight(labelFrame) + 32) break;
-        badge.backgroundColor = color;
-        badge.layer.backgroundColor = color.CGColor;
+        // Only the text label draws the pill; clear Spotify's gray backing.
+        badge.backgroundColor = UIColor.clearColor;
+        badge.layer.backgroundColor = UIColor.clearColor.CGColor;
         badge.layer.cornerRadius = MIN(8, CGRectGetHeight(badge.bounds) / 2);
         badge.layer.masksToBounds = YES;
     }
@@ -484,8 +488,21 @@ static void updatePlanBadge(UIView *root) {
     SGForEachView(root, ^(UIView *view) {
         if (![view isKindOfClass:UILabel.class]) return;
         UILabel *label = (UILabel *)view;
-        if (!isPlanBadgeLabel(label)) return;
-        stylePlanBadgeLabel(label);
+        BOOL planTitle = [label.text isEqualToString:@"Your plan"];
+        BOOL badge = isPlanBadgeLabel(label);
+        if (!planTitle && !badge) return;
+        if (badge) stylePlanBadgeLabel(label);
+        // Use UIKit's cell boundary rather than guessing a private Spotify row class.
+        // Cover the whole row so the original subscription action cannot also fire.
+        UIView *target = label;
+        for (UIView *ancestor = label.superview; ancestor && ancestor != root; ancestor = ancestor.superview) {
+            if ([ancestor isKindOfClass:UICollectionViewCell.class]) {
+                target = ((UICollectionViewCell *)ancestor).contentView;
+                break;
+            }
+        }
+        target.userInteractionEnabled = YES;
+        SGInstallPlanButton(target);
     });
 }
 
@@ -494,7 +511,7 @@ static void updatePlanBadge(UIView *root) {
 %hook UILabel
 - (void)setText:(NSString *)text {
     %orig;
-    if (text.length < 1 || text.length > 32) return;
+    if ((text.length < 1 || text.length > 32) && !objc_getAssociatedObject(self, &kPlanBadgeLabelKey)) return;
     if (!isDrawerBadgeLabel(self)) return;
     if (objc_getAssociatedObject(self, &kPlanBadgeLabelKey) == nil && !isBadgeText(text)) return;
     stylePlanBadgeLabel(self);
@@ -502,7 +519,7 @@ static void updatePlanBadge(UIView *root) {
 
 - (void)setAttributedText:(NSAttributedString *)text {
     %orig;
-    if (text.length < 1 || text.length > 32) return;
+    if ((text.length < 1 || text.length > 32) && !objc_getAssociatedObject(self, &kPlanBadgeLabelKey)) return;
     if (!isDrawerBadgeLabel(self)) return;
     if (objc_getAssociatedObject(self, &kPlanBadgeLabelKey) == nil && !isBadgeText(self.text)) return;
     stylePlanBadgeLabel(self);
