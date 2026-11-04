@@ -504,3 +504,13 @@ positioned over the outer compact Spotify badge. The original compact badge is
 alpha-zeroed, preserving stack layout while removing its gray backing and tight
 text-only green shape. The replacement label is excluded from badge discovery
 to avoid recursive overlays. The plan page itself is unchanged in this follow-up.
+
+The Individual overview now follows the supplied Spotify Student reference's
+card composition, not the inset-grouped Settings list: two dark cards with 8pt
+corners, a Premium wordmark above a green Individual title, and compact green
+checkmark benefit lines without explanatory subtitles. Manage opens Spotify's
+actual account website and Explore your benefits opens its Premium overview.
+The local-preview/account-availability note remains in the footer, outside the
+plan card. Student discounts, lossless access and billing/cancellation status
+are not invented. These are custom UIKit cards matching the reference layout,
+not a restoration of Spotify's private subscription view implementation.
