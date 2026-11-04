@@ -485,3 +485,32 @@ not the original row or its gesture recognizers. Your Premium is also available
 in Mod Settings, since a blocked profile button cannot open the drawer.
 The drawer badge now always uses Individual, preserves that text on empty account
 updates, and clears small backing containers rather than painting an extra box.
+
+Follow-up to the entry-point fallback: Jam matching now walks beyond the old
+180–500pt sheet limit, to support separately hosted rows. A presentation guard
+also rejects runtime controller families containing both Jam and Upsell. This
+runtime-name fallback needs device confirmation; it is not proof of a private
+selector. Profile taps are no longer disabled: opening the drawer must remain
+possible; Jam upsells are blocked independently. Plan touches use a window-owned
+button to avoid collection-row recognizers cancelling the original content-view
+button. Badge layout reapplies the complete style and removes attributed text
+background colors even when the foreground color is already correct.
+
+The create-menu Jam interceptor now returns a window-owned no-action UIButton,
+not the window itself. The button supplies a dark rounded highlighted state
+while held; it has no navigation target. The drawer's Individual badge uses a
+single padded rounded-rectangle surface (6pt corners, black text, green accent),
+positioned over the outer compact Spotify badge. The original compact badge is
+alpha-zeroed, preserving stack layout while removing its gray backing and tight
+text-only green shape. The replacement label is excluded from badge discovery
+to avoid recursive overlays. The plan page itself is unchanged in this follow-up.
+
+The Individual overview now follows the supplied Spotify Student reference's
+card composition, not the inset-grouped Settings list: two dark cards with 8pt
+corners, a Premium wordmark above a green Individual title, and compact green
+checkmark benefit lines without explanatory subtitles. Manage opens Spotify's
+actual account website and Explore your benefits opens its Premium overview.
+The local-preview/account-availability note remains in the footer, outside the
+plan card. Student discounts, lossless access and billing/cancellation status
+are not invented. These are custom UIKit cards matching the reference layout,
+not a restoration of Spotify's private subscription view implementation.
