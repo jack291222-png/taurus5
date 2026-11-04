@@ -1352,12 +1352,6 @@ static void openWhenUp(SGRMenuSession *session, UIViewController *sheet, int tri
 }
 %end
 
-%ctor {
-    if (!SGRedesignedUI()) return;
-    %init;
-    SGRequireClasses(@[kSheetClass]);
-}
-
 @interface SPTPremiumBadgeView : UIView
 - (void)setHidden:(BOOL)hidden;
 - (void)didMoveToSuperview;
@@ -1373,3 +1367,9 @@ static void openWhenUp(SGRMenuSession *session, UIViewController *sheet, int tri
     [self removeFromSuperview];
 }
 %end
+
+%ctor {
+    if (!SGRedesignedUI()) return;
+    %init;
+    SGRequireClasses(@[kSheetClass]);
+}
