@@ -463,3 +463,25 @@ safe-area-dependent tab-item shape cannot squash it on different devices.
 
 A class Spotify has renamed shows up in the log as `class X not found, its hooks are inactive`;
 declare the classes a feature needs in `Headers/` only when a hook calls into them by type.
+
+### Individual plan overview
+
+`App/IndividualPlan.m` supplies the drawer's Your plan/Individual tap destination in both looks.
+It keeps the Your Premium layout: a Subscription card with Premium Individual and one account,
+then a filled Snapshot of your benefits (ad-free music, offline listening, on-demand playback,
+skips and audio quality). It is explicitly a local preview, not a billing status claim: no invented
+price, renewal date, usage counts or nonfunctional Manage button. The drawer badge pass installs
+a transparent UIKit button over the containing collection cell (or the label if no cell exists),
+so the original plan destination does not also open. English drawer titles are recognized; other
+languages can still use a recognized Individual badge.
+
+`Shared/AdBlock/BlockedEntryPoints.x` intercepts window hit testing for the Jam
+band in a create sheet identified by its Playlist/Blend/Jam labels. It also
+blocks a top-left profile control when UIKit exposes Profile, Your profile,
+Open profile or Open navigation menu as its accessibility label. This is an
+English-label fallback: renamed/localized controls need a recorded device tree.
+No private Spotify selectors are assumed. The blocked touch goes to the window,
+not the original row or its gesture recognizers. Your Premium is also available
+in Mod Settings, since a blocked profile button cannot open the drawer.
+The drawer badge now always uses Individual, preserves that text on empty account
+updates, and clears small backing containers rather than painting an extra box.
