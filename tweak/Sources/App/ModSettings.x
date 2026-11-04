@@ -71,7 +71,7 @@ static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) 
 }
 
 - (instancetype)initWithSections:(NSArray<SGModSection *> *)sections {
-    return [super initWithTitle:@"taurus" intro:nil sections:sections footer:@"Contributor: @Pulse-Ice (EeveeImmersive)\nBug fixes: @darkit"];
+    return [super initWithTitle:@"Individual" intro:nil sections:sections footer:@"Contributor: @Pulse-Ice (EeveeImmersive)\nBug fixes: @darkit"];
 }
 
 - (void)viewDidLoad {
@@ -80,7 +80,7 @@ static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) 
     _masthead.backgroundColor = SGPageBackground();
     _masthead.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     _mastheadTitle = [UILabel new];
-    _mastheadTitle.text = @"taurus";
+    _mastheadTitle.text = @"Individual";
     _mastheadTitle.font = [UIFont systemFontOfSize:36 weight:UIFontWeightBold];
     _mastheadTitle.textAlignment = NSTextAlignmentRight;
     [_mastheadTitle sizeToFit];
@@ -94,7 +94,7 @@ static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) 
     self.tableView.tableHeaderView = _masthead;
 
     _compactTitle = [UILabel new];
-    _compactTitle.text = @"taurus";
+    _compactTitle.text = @"Individual";
     _compactTitle.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
     [_compactTitle sizeToFit];
     _compactTitle.textColor = SGRainbowTextColor(_compactTitle.bounds.size.width, _compactTitle.bounds.size.height, 0);
@@ -206,7 +206,7 @@ static UIViewController *modSettingsPage(void) {
     SGModRow *signing = SGSigningWarningRow();
     if (signing) signing.visible = ^BOOL { return !SGFlag(SGKeyHideSigningWarning, NO); };
     NSMutableArray<SGModRow *> *topRows = [NSMutableArray array];
-    SGModRow *update = SGActionRow(@"Taurus update available", @"Tap to view the latest release", ^{
+    SGModRow *update = SGActionRow(@"Individual update available", @"Tap to view the latest release", ^{
         NSString *url = SGUpdateNewestRelease().url;
         if (url.length) SGOpenURL(url);
     });
@@ -292,7 +292,7 @@ static UIViewController *modSettingsPage(void) {
     if (!(self = [super initWithFrame:frame])) return nil;
     _icon = SGSymbolView(@"slider.horizontal.3", 20, UIImageSymbolWeightRegular, 24);
     _title = [UILabel new];
-    _title.text = @"taurus settings";
+    _title.text = @"Individual settings";
     _title.textColor = UIColor.whiteColor;
     _chevron = SGSymbolView(@"chevron.right", 11, UIImageSymbolWeightSemibold, 12);
     for (UIView *v in @[_icon, _title, _chevron]) [self addSubview:v];
@@ -429,7 +429,7 @@ static char kPlanBadgeLabelKey;
 
 static NSString *sidebarBadgeText(void) {
     NSString *text = [NSUserDefaults.standardUserDefaults stringForKey:SGKeySidebarBadgeText];
-    return text.length ? text : @"Taurus";
+    return text.length ? text : @"Individual";
 }
 
 static BOOL isSidebarBadgeText(NSString *text) {
