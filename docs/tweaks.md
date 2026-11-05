@@ -346,9 +346,8 @@ logs are not shared unless the user explicitly chooses Copy or Share.
 ## Mod Settings
 
 Mod Settings, opened by holding Home on the tab bar or from the
-last row of Spotify's Settings (the drawer itself carries no row of the mod's; its plan badge is only
-recoloured and given the mod's words, put right the moment the drawer opens or the badge's text is set so
-a Premium account never shows Spotify Free), sorts every
+last row of Spotify's Settings (the drawer itself carries no row of the mod's; its native plan UI
+receives the Individual display data through PlanResponses.m), sorts every
 setting by the part of Spotify it changes, so a part's glass, its hide switches and its flags sit on
 one page, the mod's own rows first and Spotify's flags below them or on a sub page named after what
 they change. It opens on the Appearance card: Redesigned UI, then the stored look's accent colour, and in the native
@@ -464,76 +463,44 @@ safe-area-dependent tab-item shape cannot squash it on different devices.
 A class Spotify has renamed shows up in the log as `class X not found, its hooks are inactive`;
 declare the classes a feature needs in `Headers/` only when a hook calls into them by type.
 
-### Individual plan overview
+### Native Individual plan and Jam behavior
 
-`App/IndividualPlan.m` supplies the drawer's Your plan/Individual tap destination in both looks.
-It keeps the Your Premium layout: a Subscription card with Premium Individual and one account,
-then a filled Snapshot of your benefits (ad-free music, offline listening, on-demand playback,
-skips and audio quality). It is explicitly a local preview, not a billing status claim: no invented
-price, renewal date, usage counts or nonfunctional Manage button. The drawer badge pass installs
-a transparent UIKit button over the containing collection cell (or the label if no cell exists),
-so the original plan destination does not also open. English drawer titles are recognized; other
-languages can still use a recognized Individual badge.
+Reference inspected: `jack291222-png/Spotifypremium`, Master commit
+`b15132925a06bb8d69e8d39d9c9cef6fd77856ad`:
+`Premium/DynamicPremium+PremiumPlanRow.swift`, its generated protobuf field maps,
+`Helpers/SpotifyResponsePatcher.swift`, and `UpsellServiceBlocker.x.swift`.
+The fork does not build subscription cards; it supplies display protobufs to
+Spotify's native plan UI. `Shared/AdBlock/PlanResponses.m` independently implements
+that wire-format approach with Taurus's existing reader/writer, without importing
+the fork's Swift runtime or generated source. It patches only Spotify-hosted
+GetYourPremiumBadge, v1/GetPremiumPlanRow and GetPlanOverview responses while
+Spoof Premium is enabled. Individual is green; the six benefits include audio
+quality. Unknown fields, original notices and actions (including Manage) survive.
+Malformed messages pass through. Actual billing endpoints are never rewritten.
+The text is a local display override, not actual Premium entitlement or proof of
+payment; no billing amounts, dates or payment cards are invented.
 
-`Shared/AdBlock/BlockedEntryPoints.x` intercepts window hit testing for the Jam
-band in a create sheet identified by its Playlist/Blend/Jam labels. It also
-blocks a top-left profile control when UIKit exposes Profile, Your profile,
-Open profile or Open navigation menu as its accessibility label. This is an
-English-label fallback: renamed/localized controls need a recorded device tree.
-No private Spotify selectors are assumed. The blocked touch goes to the window,
-not the original row or its gesture recognizers. Your Premium is also available
-in Mod Settings, since a blocked profile button cannot open the drawer.
-The drawer badge now always uses Individual, preserves that text on empty account
-updates, and clears small backing containers rather than painting an extra box.
+The custom IndividualPlan screen, its Manage clone, drawer label overlays, plan
+tap interception and obsolete sidebar-text setting have been removed. Spotify
+owns the original card sizes, badge padding, navigation and Manage destination.
+There is no promise that a free account has a complete billing page; the native
+response controls it. Previously cached responses can require a fresh fetch;
+conditional request validators are stripped on the three display endpoints.
 
-Follow-up to the entry-point fallback: Jam matching now walks beyond the old
-180–500pt sheet limit, to support separately hosted rows. A presentation guard
-also rejects runtime controller families containing both Jam and Upsell. This
-runtime-name fallback needs device confirmation; it is not proof of a private
-selector. Profile taps are no longer disabled: opening the drawer must remain
-possible; Jam upsells are blocked independently. Plan touches use a window-owned
-button to avoid collection-row recognizers cancelling the original content-view
-button. Badge layout reapplies the complete style and removes attributed text
-background colors even when the foreground color is already correct.
+Jam uses Spotify's original controls and gestures again. The old window-level
+hit-test button, press scaling and guessed presentation-name guard are removed.
+Taurus already has the fork's no-op load hooks for FreeHostedJamsUpsellServiceImpl,
+FreeUserSkipUpsellPageService and FreeUserShuffleUpsellSheetPageService in
+AdServices.x, gated by Hide upsells. That switch must remain on for no upsell.
+Unlike the fork, Taurus retains its enabled premium-gated Jam-entry flag so the
+user-requested Jam row is not deliberately hidden. Native touch feedback is no
+longer intercepted; whether the supported Spotify build routes a tap solely to
+these services needs device verification. This does not unlock Jam hosting.
 
-The create-menu Jam interceptor now returns a window-owned no-action UIButton,
-not the window itself. The button supplies a dark rounded highlighted state
-while held; it has no navigation target. The drawer's Individual badge uses a
-single padded rounded-rectangle surface (6pt corners, black text, green accent),
-positioned over the outer compact Spotify badge. The original compact badge is
-alpha-zeroed, preserving stack layout while removing its gray backing and tight
-text-only green shape. The replacement label is excluded from badge discovery
-to avoid recursive overlays. The plan page itself is unchanged in this follow-up.
-
-The Individual overview now follows the supplied Spotify Student reference's
-card composition, not the inset-grouped Settings list: two dark cards with 8pt
-corners, a Premium wordmark above a green Individual title, and compact green
-checkmark benefit lines without explanatory subtitles. Manage opens Spotify's
-actual account website and Explore your benefits opens its Premium overview.
-The local-preview/account-availability note remains in the footer, outside the
-plan card. Student discounts, lossless access and billing/cancellation status
-are not invented. These are custom UIKit cards matching the reference layout,
-not a restoration of Spotify's private subscription view implementation.
-
-The screenshot-matched plan card places its gray Subscription tab inside the
-card's upper-left corner; the benefits list and audio-quality wording are kept.
-This remains a UIKit reconstruction, not Spotify's private native card class.
-Jam's no-action touch control now keeps the active control attached through
-repeated hit tests. Its highlight changes the underlying Spotify row background
-to black and restores its prior color/corner radius on release or cancellation;
-it does not draw a dark overlay over the original title and icon. On-device
-tracking and cancellation still need verification before merging.
-
-### Subscription reference follow-up
-
-The Your Premium overview retains the fuller benefits list (including audio
-quality), but tightens the plan card to the supplied Spotify reference: inset
-Subscription tab, compact Premium/green Individual heading and trailing Manage
-button. Manage now pushes an in-app Manage subscription page with three cards:
-Individual/one account, Payment, and available plans/add-ons. It never copies the
-reference image's price, renewal date or card number: View billing on Spotify
-opens the real account site. These remain screenshot-matched custom UIKit cards,
-not Spotify private view classes. Jam now explicitly implements UIControl touch
-tracking for tap/hold/drag-out/cancel, with black background and a slight press
-scale on the existing row. These changes need a successful macOS release build
-and on-device verification; layer checks alone do not verify touch behavior.
+Validation: `sh scripts/check-layers.sh tweak/Sources`, `git diff --check`, and on
+macOS `sh scripts/test-plan-responses.sh` (also a PR workflow). The Objective-C
+fixture test exercises the actual patcher, protobuf round-trips, strict URL
+matching, unknown/action/notice preservation, malformed input, benefits, badge
+color/version and idempotence. No Apple SDK is available in the agent sandbox;
+full `make release` and device press/hold/drag-off/navigation checks remain
+required before merging.

@@ -10,6 +10,7 @@
 #import "Core/SGCore.h"
 #import "Core/SGURLSession.h"
 #import "AdBlock.h"
+#import "PlanResponses.h"
 
 static BOOL ads, premium;
 static NSDate *started;
@@ -89,6 +90,7 @@ static BOOL isRefetch(NSString *path) {
 
 static SGNet classify(NSURL *url) {
     NSString *path = url.path.lowercaseString ?: @"";
+    if (premium && SGIsPlanResponseURL(url)) return SGNetPatch;
     if (premium && isLogout(path)) return SGNetBlock;
     if (ads && isAd(url, path)) return SGNetBlock;
     if (premium && elapsed() > 30 && isRefetch(path)) return SGNetBlock;
@@ -118,6 +120,11 @@ static NSData *blockedReply(NSString *path) {
 
 static NSData *patched(NSURL *url, NSData *body) {
     NSString *path = url.path.lowercaseString ?: @"";
+    if (SGIsPlanResponseURL(url)) {
+        NSData *result = SGPatchPlanResponse(url, body);
+        SGLog(@"native plan response %@: %@", path, result ? @"rewritten" : @"passed through");
+        return result;
+    }
     if (isFeed(path)) return SGStripFeed(body);
     SGAdBlockSawOne(@"Config rewrites");
     NSData *result = isBootstrap(path) ? SGPatchBootstrap(body) : SGPatchCustomize(body);
@@ -291,7 +298,7 @@ static void complete(id<NSURLSessionDataDelegate> delegate, NSURLSession *sessio
 // go out without the question, and the server always answers in full.
 static NSURLRequest *unconditional(NSURLRequest *request) {
     NSString *host = request.URL.host.lowercaseString ?: @"", *path = request.URL.path.lowercaseString ?: @"";
-    if (!(has(host, @"spotify") || has(host, @"spclient")) || !(isBootstrap(path) || isCustomize(path))) return nil;
+    if (!(has(host, @"spotify") || has(host, @"spclient")) || !(isBootstrap(path) || isCustomize(path) || SGIsPlanResponseURL(request.URL))) return nil;
     if (![request valueForHTTPHeaderField:@"If-None-Match"] && ![request valueForHTTPHeaderField:@"If-Modified-Since"]) return nil;
     NSMutableURLRequest *plain = [request mutableCopy];
     [plain setValue:nil forHTTPHeaderField:@"If-None-Match"];

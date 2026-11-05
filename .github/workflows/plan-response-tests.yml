@@ -1,0 +1,19 @@
+name: Native plan response tests
+on:
+  pull_request:
+    paths:
+      - 'tweak/Sources/Shared/AdBlock/PlanResponses.*'
+      - 'tweak/Sources/Shared/AdBlock/Protobuf.*'
+      - 'tests/plan-responses/**'
+      - 'scripts/test-plan-responses.sh'
+      - '.github/workflows/plan-response-tests.yml'
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - run: sh scripts/test-plan-responses.sh
