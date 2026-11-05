@@ -523,3 +523,17 @@ repeated hit tests. Its highlight changes the underlying Spotify row background
 to black and restores its prior color/corner radius on release or cancellation;
 it does not draw a dark overlay over the original title and icon. On-device
 tracking and cancellation still need verification before merging.
+
+### Subscription reference follow-up
+
+The Your Premium overview retains the fuller benefits list (including audio
+quality), but tightens the plan card to the supplied Spotify reference: inset
+Subscription tab, compact Premium/green Individual heading and trailing Manage
+button. Manage now pushes an in-app Manage subscription page with three cards:
+Individual/one account, Payment, and available plans/add-ons. It never copies the
+reference image's price, renewal date or card number: View billing on Spotify
+opens the real account site. These remain screenshot-matched custom UIKit cards,
+not Spotify private view classes. Jam now explicitly implements UIControl touch
+tracking for tap/hold/drag-out/cancel, with black background and a slight press
+scale on the existing row. These changes need a successful macOS release build
+and on-device verification; layer checks alone do not verify touch behavior.
