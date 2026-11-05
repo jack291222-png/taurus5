@@ -19,7 +19,6 @@
 #import "Shared/ListeningStats/ListeningStats.h"
 #import "App/About/About.h"
 #import "Pages.h"
-#import "IndividualPlan.h"
 
 static const CGFloat kRowHeight = 56;
 static char kRowKey, kInsetKey;
@@ -232,7 +231,6 @@ static UIViewController *modSettingsPage(void) {
     downloads.value = ^NSString *{ return SGDownloadsRowSummary(); };
     downloads.refreshOn = SGDownloadsDidChangeNotification;
     NSMutableArray<SGModRow *> *parts = [NSMutableArray arrayWithArray:@[
-        pageRow(@"Your Premium", @"person.fill", ^UIViewController *{ return SGIndividualPlanPage(); }),
         pageRow(@"Appearance", @"paintpalette", ^UIViewController *{ return SGAppearanceSettingsPage(); }),
         pageRow(@"Navbar", @"dock.rectangle", ^UIViewController *{ return SGNavbarPage(); }),
         pageRow(@"Player", @"play.circle", ^UIViewController *{ return SGPlayerSettingsPage(); }),
@@ -404,168 +402,11 @@ static BOOL isSettingsRoot(UIViewController *list) {
 }
 %end
 
-static UIColor *planBadgeColor(void) {
-    if (!SGRedesignedUI()) return SGGreen();
-    NSInteger rgb = SGInt(@"spotifyglass.redesign.accent", 0x37F200);
-    if (rgb < 0 || rgb > 0xFFFFFF) return SGGreen();
-    return [UIColor colorWithRed:((rgb >> 16) & 0xFF) / 255.0
-                           green:((rgb >> 8) & 0xFF) / 255.0
-                            blue:(rgb & 0xFF) / 255.0 alpha:1];
-}
-
-// Own the complete badge surface instead of coloring a tight text glyph box.
-@interface SGIndividualBadgeLabel : UILabel
-@end
-@implementation SGIndividualBadgeLabel
-@end
-static char kIndividualBadgeSurfaceKey;
-
-static __weak UIView *sg_drawerRoot;
-static char kPlanBadgeLabelKey;
-
-static NSString *sidebarBadgeText(void) {
-    return @"Individual";
-}
-
-// Spotify's own words for the drawer's badge, before the mod has had a say. "Spotify Free" is what it says
-// for a moment while the account loads, on a Premium one too, so it is restyled rather than left alone.
-static BOOL isBadgeText(NSString *text) {
-    return [text isEqualToString:@"Spotify Free"] || [text isEqualToString:@"Spotify Premium"]
-        || [text isEqualToString:@"Individual"] || [text isEqualToString:@"Premium"]
-        || [text isEqualToString:@"Free"] || [text isEqualToString:@"Student"] || [text isEqualToString:@"Taurine"]
-        || [text isEqualToString:@"Taurus"] || [text isEqualToString:sidebarBadgeText()];
-}
-
-static BOOL isDrawerBadgeLabel(UILabel *label) {
-    if ([label isKindOfClass:SGIndividualBadgeLabel.class]) return NO;
-    for (UIView *view = label; view; view = view.superview) {
-        if (view == sg_drawerRoot ||
-            [NSStringFromClass(view.class) containsString:@"SideDrawerListCollectionView"]) return YES;
-    }
-    return NO;
-}
-
-static BOOL isPlanBadgeLabel(UILabel *label) {
-    return objc_getAssociatedObject(label, &kPlanBadgeLabelKey) != nil || isBadgeText(label.text);
-}
-
-// Puts the badge on its colour with the mod's words, even before it has a frame: the corner is worked out
-// again when it has one, by the UILabel hook below.
-static void stylePlanBadgeLabel(UILabel *label) {
-    objc_setAssociatedObject(label, &kPlanBadgeLabelKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (![label.text isEqualToString:@"Individual"]) label.text = @"Individual";
-    // Find the outer compact badge, stopping well before the full drawer row.
-    UIView *host = label;
-    for (UIView *v = label.superview; v && v != sg_drawerRoot; v = v.superview) {
-        if (v.bounds.size.height > 48 || v.bounds.size.width > 220) break;
-        host = v;
-    }
-    if (!host.superview || host.bounds.size.width < 1 || host.bounds.size.height < 1) return;
-    SGIndividualBadgeLabel *surface = objc_getAssociatedObject(label, &kIndividualBadgeSurfaceKey);
-    if (!surface) {
-        surface = [SGIndividualBadgeLabel new];
-        surface.text = @"Individual";
-        surface.textAlignment = NSTextAlignmentCenter;
-        surface.userInteractionEnabled = NO;
-        surface.isAccessibilityElement = NO; // The original plan row remains accessible.
-        objc_setAssociatedObject(label, &kIndividualBadgeSurfaceKey, surface, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    surface.font = label.font ?: [UIFont boldSystemFontOfSize:16];
-    surface.textColor = UIColor.blackColor;
-    surface.backgroundColor = planBadgeColor();
-    surface.layer.cornerRadius = 6;
-    surface.clipsToBounds = YES;
-    CGFloat width = ceil([surface.text sizeWithAttributes:@{NSFontAttributeName:surface.font}].width) + 24;
-    CGFloat height = MAX(32, ceil(surface.font.lineHeight) + 12);
-    CGRect rect = host.frame;
-    surface.frame = CGRectMake(CGRectGetMaxX(rect) - width, CGRectGetMidY(rect) - height / 2, width, height);
-    // Alpha leaves Spotify's Encore stack layout intact. Replacing the whole
-    // surface also removes sibling/background gray layers, not just ancestors.
-    host.alpha = 0;
-    if (surface.superview != host.superview) [host.superview addSubview:surface];
-    [host.superview bringSubviewToFront:surface];
-}
-
-static void updatePlanBadge(UIView *root) {
-    SGForEachView(root, ^(UIView *view) {
-        if (![view isKindOfClass:UILabel.class]) return;
-        UILabel *label = (UILabel *)view;
-        if ([label isKindOfClass:SGIndividualBadgeLabel.class]) return;
-        BOOL planTitle = [label.text isEqualToString:@"Your plan"];
-        BOOL badge = isPlanBadgeLabel(label);
-        if (!planTitle && !badge) return;
-        if (badge) stylePlanBadgeLabel(label);
-        // Use UIKit's cell boundary rather than guessing a private Spotify row class.
-        // Cover the whole row so the original subscription action cannot also fire.
-        UIView *target = label;
-        for (UIView *ancestor = label.superview; ancestor && ancestor != root; ancestor = ancestor.superview) {
-            if ([ancestor isKindOfClass:UICollectionViewCell.class]) {
-                target = ((UICollectionViewCell *)ancestor).contentView;
-                break;
-            }
-        }
-        target.userInteractionEnabled = YES;
-        SGInstallPlanButton(target);
-    });
-}
-
-// Every label is watched: the drawer's badge is found before it has its words, its frame or its place, and
-// Spotify sets them all after it is made. Outside the drawer nothing is touched.
-%hook UILabel
-- (void)setText:(NSString *)text {
-    %orig;
-    if ((text.length < 1 || text.length > 32) && !objc_getAssociatedObject(self, &kPlanBadgeLabelKey)) return;
-    if (!isDrawerBadgeLabel(self)) return;
-    if (objc_getAssociatedObject(self, &kPlanBadgeLabelKey) == nil && !isBadgeText(text)) return;
-    stylePlanBadgeLabel(self);
-}
-
-- (void)setAttributedText:(NSAttributedString *)text {
-    %orig;
-    if ((text.length < 1 || text.length > 32) && !objc_getAssociatedObject(self, &kPlanBadgeLabelKey)) return;
-    if (!isDrawerBadgeLabel(self)) return;
-    if (objc_getAssociatedObject(self, &kPlanBadgeLabelKey) == nil && !isBadgeText(self.text)) return;
-    stylePlanBadgeLabel(self);
-}
-
-- (void)layoutSubviews {
-    %orig;
-    if (objc_getAssociatedObject(self, &kPlanBadgeLabelKey) == nil) return;
-    if (isDrawerBadgeLabel(self)) stylePlanBadgeLabel(self);
-}
-%end
-
-// A window-owned button avoids collection-cell tap recognizers cancelling the plan action.
-%hook UIWindow
-- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    SGClearPlanTouch(self);
-    UIView *hit = %orig;
-    return SGRoutePlanTouch(self, point, hit);
-}
-%end
-
-// Keep the drawer's plan badge current as Spotify rebuilds its view, and put it right whenever the drawer is
-// opened: its labels are made before the account has answered, so a first pass alone can leave "Spotify Free".
-%hook _TtC23SideDrawer_ListPageImpl18ListViewController
-- (void)viewDidLayoutSubviews {
-    %orig;
-    sg_drawerRoot = ((UIViewController *)self).view;
-    updatePlanBadge(sg_drawerRoot);
-}
-
-- (void)viewWillAppear:(BOOL)animated {
-    %orig;
-    sg_drawerRoot = ((UIViewController *)self).view;
-    updatePlanBadge(sg_drawerRoot);
-}
-%end
-
 // The lists lay out after their controllers and again whenever their content changes. Only a list that already
 // has the settings row (the hook above puts it on Spotify's Settings list) is given it here.
 %hook UICollectionView
 - (void)layoutSubviews {
     %orig;
-    if ([NSStringFromClass(self.class) containsString:@"SideDrawerListCollectionView"]) updatePlanBadge(self);
     SGModSettingsRow *row = objc_getAssociatedObject(self, &kRowKey);
     if (!row) return;
     if (row.superview != self) [self addSubview:row];
@@ -575,11 +416,7 @@ static void updatePlanBadge(UIView *root) {
 
 %ctor {
     %init;
-    [NSNotificationCenter.defaultCenter addObserverForName:SGSidebarBadgeTextDidChangeNotification object:nil queue:NSOperationQueue.mainQueue
-                                                usingBlock:^(NSNotification *note) {
-        if (sg_drawerRoot) updatePlanBadge(sg_drawerRoot);
-    }];
-    SGRequireClasses(@[@"_TtC21Settings_PlatformImpl26SettingsListViewController", @"_TtC23SideDrawer_ListPageImpl18ListViewController"]);
+    SGRequireClasses(@[@"_TtC21Settings_PlatformImpl26SettingsListViewController"]);
     SGRegisterPages();
     SGCheckSigningOnce();
 }

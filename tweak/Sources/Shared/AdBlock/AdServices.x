@@ -66,6 +66,8 @@ static void takeDown(UIView *view) {
 %hook _TtC31ReinventFree_DownloadUpsellImpl21DownloadUpsellService
 - (void)load { SGAdBlockCountOne(@"Upsell services"); }
 %end
+// Same service-level suppression as the inspected EeveeSpotify fork: preserve
+// Spotify's native Create-row touch feedback; suppress only the upsell load.
 %hook _TtC28Jam_FreeHostedJamsUpsellImpl31FreeHostedJamsUpsellServiceImpl
 - (void)load { SGAdBlockCountOne(@"Upsell services"); }
 %end
