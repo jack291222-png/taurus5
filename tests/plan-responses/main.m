@@ -17,7 +17,7 @@ int main(void) {
         NSData *immediateBadge = SGImmediatePlanBadge(endpoint(@"GetYourPremiumBadge"));
         NSCAssert(immediateBadge != nil, @"badge does not need server data");
         NSCAssert([SGPBText(SGPBFirst(parse(immediateBadge), 1)) isEqualToString:@"Individual"], @"immediate badge name");
-        NSCAssert([SGPBText(SGPBFirst(parse(immediateBadge), 3)) isEqualToString:@"#1DB954"], @"immediate badge color");
+        NSCAssert([SGPBText(SGPBFirst(parse(immediateBadge), 3)) isEqualToString:@"#1ED760"], @"immediate badge color");
         NSCAssert(SGImmediatePlanBadge(overview) == nil, @"do not short circuit overview or native Manage actions");
         NSCAssert(SGImmediatePlanBadge(endpoint(@"GetPremiumPlanRow")) == nil, @"do not short circuit row actions");
         NSCAssert(SGImmediatePlanBadge([NSURL URLWithString:@"https://evilspotify.com/v1/GetYourPremiumBadge"]) == nil, @"immediate badge host boundary");
@@ -34,7 +34,7 @@ int main(void) {
         NSData *unknown = SGPBSerialize(@[SGPBVarint(99, 123)]);
         NSArray *badge = parse(SGPatchPlanResponse(endpoint(@"GetYourPremiumBadge"), unknown));
         NSCAssert([SGPBText(SGPBFirst(badge, 1)) isEqualToString:@"Individual"], @"badge words");
-        NSCAssert([SGPBText(SGPBFirst(badge, 3)) isEqualToString:@"#1DB954"], @"badge color");
+        NSCAssert([SGPBText(SGPBFirst(badge, 3)) isEqualToString:@"#1ED760"], @"badge color");
         NSCAssert(SGPBFirst(badge, 2).varint == 2, @"badge version");
         NSCAssert(SGPBFirst(badge, 99).varint == 123, @"badge unknown fields");
         NSData *rowInput = SGPBSerialize(@[SGPBString(3, @"Free"), SGPBString(9, @"Manage"), SGPBVarint(99, 456)]);
@@ -54,7 +54,7 @@ int main(void) {
         NSArray *subscription = parse(SGPBFirst(root, 1).payload);
         NSCAssert([SGPBText(SGPBFirst(subscription, 3)) isEqualToString:@"Individual"], @"plan name");
         NSCAssert([SGPBText(SGPBFirst(subscription, 4)) isEqualToString:@"Individual"], @"native category heading must also be Individual");
-        NSCAssert([SGPBText(SGPBFirst(subscription, 5)) isEqualToString:@"#1DB954"], @"plan color");
+        NSCAssert([SGPBText(SGPBFirst(subscription, 5)) isEqualToString:@"#1ED760"], @"plan color");
         NSCAssert(SGPBFirst(subscription, 99).varint == 789, @"nested unknown field");
         NSUInteger count = 0;
         BOOL quality = NO;

@@ -30,7 +30,7 @@ NSData *SGPatchPlanResponse(NSURL *url, NSData *body) {
     if (!kind || !body) return nil;
     NSMutableArray<SGPBField *> *fields = SGPBParse(body);
     if (!fields) return nil; // Unknown/malformed payload: pass through, never destroy it.
-    NSString *green = @"#1DB954";
+    NSString *green = @"#1ED760";
     if (kind == 1) {
         replaceFields(fields, @[@1, @2, @3], @[
             SGPBString(1, @"Individual"), SGPBVarint(2, 2), SGPBString(3, green)
