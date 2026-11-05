@@ -558,3 +558,24 @@ from sessions created before hook initialization can still need device tracing;
 this cannot be confirmed as eliminating every blurred frame without testing.
 The macOS fixture test covers the immediate data and endpoint exclusions; the
 NSURLProtocol/UIKit behavior still needs a full build and device verification.
+
+### Taurus green and completion-handler plan responses
+
+Per the final color choice, the native plan badge, plan row and overview use
+Taurus's brighter default #1ED760. Benefit checkmarks also retain #1ED760.
+The Individual name, native cards, Manage actions and six-benefit list are
+unchanged. The fixtures assert Taurus green for immediate and rewritten badges
+and the overview. This is the user's chosen Taurus color, not a claim about
+Spotify's official Individual-plan palette.
+
+PlanCompletion.x extends the model-first response approach to NSURLSession's
+public request/URL completion-handler APIs, in addition to the existing delegate
+pipeline. Only plan-display endpoints are wrapped. Errors, unsupported hosts,
+non-success responses and malformed bodies pass through. Empty successful badge
+replies and badge 304s use the deterministic local Individual model; plan-row or
+overview actions are not fabricated for missing bodies. __NSURLSessionLocal is
+hooked only for subclass-owned implementations. No loading UI is hidden, no
+replacement overlay is drawn, and no animations are globally disabled. This
+closes a response-coverage gap, but is not evidence that the native drawer's
+blur/skeleton animation is gone on-device. The actual transport and rendering
+path still need device validation; macOS fixture tests do not cover UIKit.
