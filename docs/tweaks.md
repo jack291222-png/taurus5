@@ -345,9 +345,9 @@ logs are not shared unless the user explicitly chooses Copy or Share.
 
 ## Mod Settings
 
-Mod Settings, opened by holding Home on the tab bar or from the
-last row of Spotify's Settings (the drawer itself carries no row of the mod's; its native plan UI
-receives the Individual display data through PlanResponses.m), sorts every
+Mod Settings, opened by holding Home on the tab bar (neither Spotify's Settings
+list nor its drawer carries a mod-settings row; the native plan UI receives
+Individual display data through PlanResponses.m), sorts every
 setting by the part of Spotify it changes, so a part's glass, its hide switches and its flags sit on
 one page, the mod's own rows first and Spotify's flags below them or on a sub page named after what
 they change. It opens on the Appearance card: Redesigned UI, then the stored look's accent colour, and in the native
@@ -504,3 +504,33 @@ matching, unknown/action/notice preservation, malformed input, benefits, badge
 color/version and idempotence. No Apple SDK is available in the agent sandbox;
 full `make release` and device press/hold/drag-off/navigation checks remain
 required before merging.
+
+### Native plan heading, Jam sheet and quality-marker follow-up
+
+Both native subscription display strings (protobuf fields 3 and 4) now say
+Individual. Field 4 previously said Premium, which the current Spotify UI uses
+as its large green heading; the small native Premium logo/branding is untouched.
+The existing fixture test now seeds Premium into field 4 and asserts Individual.
+
+`Shared/AdBlock/JamPresentation.x` preserves native touch tracking. For Create
+rows implemented as UIControls, it swallows sendAction only when the compact row
+contains both Jam and Listen together from anywhere. Gesture-driven versions
+also get a presentation/push guard: load the destination before presenting and
+reject it only if it contains both observed sheet texts Music sounds better
+together and Explore Premium. This covers the actual screenshot's sheet, unlike
+the Encore-only popup filter. No window hit-test overrides or overlay buttons
+are added. Destination preflight loads UIKit views earlier than normal; this and
+English-copy matching must be verified on-device. A sheet whose text arrives
+asynchronously or is localized may need a recorded tree/new matching rule. It
+is intentionally not a blanket Premium-page blocker. Hide upsells gates it.
+
+AdBadges.x also removes a standalone Premium marker in a compact Very high row,
+and strips the Premium suffix from combined plain/attributed option titles
+(preserving the leading attributes). It uses alpha for standalone badges and
+restores it when a view is reused. It does not change media quality values,
+billing, account entitlements, the availability of lossless audio or actual
+bitrate access. All this behavior is shared by Native and Redesigned looks.
+
+The Individual settings row at the bottom of Spotify Settings and privacy has
+been removed in App/ModSettings.x, including its collection-view layout hook and
+extra bottom inset. Holding Home still calls SGOpenModSettings in either look.

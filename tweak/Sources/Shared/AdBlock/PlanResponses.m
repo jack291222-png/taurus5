@@ -47,7 +47,7 @@ NSData *SGPatchPlanResponse(NSURL *url, NSData *body) {
         if (!subscription) return nil;
         NSMutableArray<SGPBField *> *display = [NSMutableArray arrayWithArray:@[
             SGPBVarint(2, 2), SGPBString(3, @"Individual"),
-            SGPBString(4, @"Premium"), SGPBString(5, green)
+            SGPBString(4, @"Individual"), SGPBString(5, green)
         ]];
         NSArray<NSString *> *benefits = @[@"Ad-free music listening", @"Download to listen offline",
             @"Play songs in any order", @"High quality audio", @"Listen with friends in real time",

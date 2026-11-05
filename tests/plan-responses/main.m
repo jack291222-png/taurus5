@@ -35,7 +35,7 @@ int main(void) {
         NSCAssert([SGPBText(SGPBFirst(row, 3)) isEqualToString:@"Individual"], @"row name");
         NSCAssert([SGPBText(SGPBFirst(row, 9)) isEqualToString:@"Manage"], @"row action survives");
         NSCAssert(SGPBFirst(row, 99).varint == 456, @"row unknown fields");
-        NSData *sub = SGPBSerialize(@[SGPBString(3, @"Free"), SGPBString(19, @"original-background"), SGPBVarint(99, 789)]);
+        NSData *sub = SGPBSerialize(@[SGPBString(3, @"Free"), SGPBString(4, @"Premium"), SGPBString(19, @"original-background"), SGPBVarint(99, 789)]);
         NSData *actions = SGPBSerialize(@[SGPBString(1, @"manage-action")]);
         NSData *notice = SGPBSerialize(@[SGPBString(1, @"original billing notice")]);
         NSData *input = SGPBSerialize(@[SGPBBytes(1, sub), SGPBBytes(2, notice), SGPBBytes(3, actions), SGPBVarint(99, 42)]);
@@ -46,6 +46,7 @@ int main(void) {
         NSCAssert(SGPBFirst(root, 99).varint == 42, @"root unknown field");
         NSArray *subscription = parse(SGPBFirst(root, 1).payload);
         NSCAssert([SGPBText(SGPBFirst(subscription, 3)) isEqualToString:@"Individual"], @"plan name");
+        NSCAssert([SGPBText(SGPBFirst(subscription, 4)) isEqualToString:@"Individual"], @"native category heading must also be Individual");
         NSCAssert([SGPBText(SGPBFirst(subscription, 5)) isEqualToString:@"#1DB954"], @"plan color");
         NSCAssert(SGPBFirst(subscription, 99).varint == 789, @"nested unknown field");
         NSUInteger count = 0;
