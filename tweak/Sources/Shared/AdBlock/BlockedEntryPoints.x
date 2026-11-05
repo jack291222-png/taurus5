@@ -40,6 +40,7 @@ static BOOL SGIsBlockedJamTouch(UIView *hit, UIWindow *window, CGPoint point, CG
 @property(nonatomic, weak) UIView *feedbackRow;
 @property(nonatomic, strong) UIColor *restingColor;
 @property(nonatomic) CGFloat restingCorner;
+@property(nonatomic) CATransform3D restingTransform;
 @end
 @implementation SGJamPressButton
 - (void)setHighlighted:(BOOL)highlighted {
@@ -47,6 +48,28 @@ static BOOL SGIsBlockedJamTouch(UIView *hit, UIWindow *window, CGPoint point, CG
     // Paint behind Spotify's own icon and text, never over them.
     self.feedbackRow.backgroundColor = highlighted ? UIColor.blackColor : self.restingColor;
     self.feedbackRow.layer.cornerRadius = highlighted ? 16 : self.restingCorner;
+    self.feedbackRow.layer.transform = highlighted
+        ? CATransform3DScale(self.restingTransform, 0.98, 0.98, 1) : self.restingTransform;
+}
+// Do not rely on UIButton's implicit tracking for a control with no actions.
+// Explicit tracking provides feedback for taps, holds, drag-out and cancellation.
+- (BOOL)beginTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event {
+    self.highlighted = YES;
+    return YES;
+}
+- (BOOL)continueTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event {
+    self.highlighted = CGRectContainsPoint(self.bounds, [touch locationInView:self]);
+    return YES;
+}
+- (void)endTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event {
+    self.highlighted = NO;
+}
+- (void)cancelTrackingWithEvent:(UIEvent *)event {
+    self.highlighted = NO;
+}
+- (void)willMoveToWindow:(UIWindow *)window {
+    if (!window) self.highlighted = NO;
+    [super willMoveToWindow:window];
 }
 @end
 static char kJamPressButtonKey;
@@ -73,6 +96,7 @@ static char kJamPressButtonKey;
     button.feedbackRow = feedback;
     button.restingColor = feedback.backgroundColor;
     button.restingCorner = feedback.layer.cornerRadius;
+    button.restingTransform = feedback.layer.transform;
     button.frame = CGRectInset(row, 4, 0);
     [self addSubview:button];
     return button;

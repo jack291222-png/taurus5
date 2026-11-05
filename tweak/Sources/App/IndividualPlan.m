@@ -5,6 +5,7 @@
 #import <objc/runtime.h>
 
 @interface SGIndividualPlanPageController : SGPage
+@property(nonatomic) BOOL managing;
 @end
 
 static UIColor *SGPlanGreen(void) {
@@ -23,7 +24,7 @@ static UILabel *SGPlanText(NSString *text, CGFloat size, UIFontWeight weight, UI
 - (instancetype)init { return [super initWithStyle:UITableViewStylePlain]; }
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"Your Premium";
+    self.title = self.managing ? @"Manage subscription" : @"Your Premium";
     self.tableView.backgroundColor = [UIColor colorWithWhite:0.07 alpha:1];
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
@@ -36,6 +37,11 @@ static UILabel *SGPlanText(NSString *text, CGFloat size, UIFontWeight weight, UI
 }
 - (void)closePlan { [self dismissViewControllerAnimated:YES completion:nil]; }
 - (void)managePlan {
+    SGIndividualPlanPageController *page = [SGIndividualPlanPageController new];
+    page.managing = YES;
+    SGShowPage(self, page);
+}
+- (void)openAccount {
     [UIApplication.sharedApplication openURL:[NSURL URLWithString:@"https://www.spotify.com/account/"] options:@{} completionHandler:nil];
 }
 - (void)exploreBenefits {
@@ -48,7 +54,7 @@ static UILabel *SGPlanText(NSString *text, CGFloat size, UIFontWeight weight, UI
         NSFontAttributeName: [UIFont systemFontOfSize:16 weight:UIFontWeightBold]
     }];
     configuration.baseForegroundColor = UIColor.whiteColor;
-    configuration.contentInsets = NSDirectionalEdgeInsetsMake(12, 20, 12, 20);
+    configuration.contentInsets = NSDirectionalEdgeInsetsMake(8, 16, 8, 16);
     button.configuration = configuration;
     button.layer.borderWidth = 1;
     button.layer.borderColor = [UIColor colorWithWhite:0.55 alpha:1].CGColor;
@@ -56,13 +62,44 @@ static UILabel *SGPlanText(NSString *text, CGFloat size, UIFontWeight weight, UI
     [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
     return button;
 }
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 2; }
+- (UIControl *)managementLink:(NSString *)title subtitle:(NSString *)subtitle action:(SEL)action {
+    UIControl *link = [UIControl new];
+    link.isAccessibilityElement = YES;
+    link.accessibilityTraits = UIAccessibilityTraitButton;
+    link.accessibilityLabel = [NSString stringWithFormat:@"%@. %@", title, subtitle];
+    [link addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+    UIStackView *words = [UIStackView new];
+    words.axis = UILayoutConstraintAxisVertical;
+    words.spacing = 6;
+    words.userInteractionEnabled = NO;
+    words.translatesAutoresizingMaskIntoConstraints = NO;
+    [words addArrangedSubview:SGPlanText(title, 19, UIFontWeightRegular, UIColor.whiteColor)];
+    [words addArrangedSubview:SGPlanText(subtitle, 16, UIFontWeightRegular, UIColor.lightGrayColor)];
+    UIImageView *chevron = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.right"]];
+    chevron.tintColor = UIColor.lightGrayColor;
+    chevron.contentMode = UIViewContentModeScaleAspectFit;
+    chevron.translatesAutoresizingMaskIntoConstraints = NO;
+    [link addSubview:words];
+    [link addSubview:chevron];
+    [NSLayoutConstraint activateConstraints:@[
+        [words.leadingAnchor constraintEqualToAnchor:link.leadingAnchor],
+        [words.topAnchor constraintEqualToAnchor:link.topAnchor constant:4],
+        [words.bottomAnchor constraintEqualToAnchor:link.bottomAnchor constant:-4],
+        [words.trailingAnchor constraintEqualToAnchor:chevron.leadingAnchor constant:-12],
+        [chevron.trailingAnchor constraintEqualToAnchor:link.trailingAnchor],
+        [chevron.centerYAnchor constraintEqualToAnchor:link.centerYAnchor],
+        [chevron.widthAnchor constraintEqualToConstant:16],
+        [chevron.heightAnchor constraintEqualToConstant:24]
+    ]];
+    return link;
+}
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return self.managing ? 3 : 2; }
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return 1; }
-- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section { return section == 0 ? 24 : 72; }
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section { return self.managing ? 16 : (section == 0 ? 24 : 72); }
 - (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
     UIView *header = [UIView new];
     header.backgroundColor = tableView.backgroundColor;
-    if (section == 0) return header;
+    if (self.managing || section == 0) return header;
     UILabel *title = SGPlanText(section == 0 ? @"Subscription" : @"Snapshot of your benefits", 22, UIFontWeightBold, UIColor.whiteColor);
     title.translatesAutoresizingMaskIntoConstraints = NO;
     [header addSubview:title];
@@ -94,10 +131,30 @@ static UILabel *SGPlanText(NSString *text, CGFloat size, UIFontWeight weight, UI
         [card.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor],
         [stack.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:20],
         [stack.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-20],
-        [stack.topAnchor constraintEqualToAnchor:card.topAnchor constant:(indexPath.section == 0 ? 64 : 24)],
-        [stack.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-24]
+        [stack.topAnchor constraintEqualToAnchor:card.topAnchor constant:(!self.managing && indexPath.section == 0 ? 48 : 24)],
+        [stack.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-16]
     ]];
-    if (indexPath.section == 0) {
+    if (self.managing) {
+        if (indexPath.section == 0) {
+            [stack addArrangedSubview:SGPlanText(@"Premium", 18, UIFontWeightBold, UIColor.whiteColor)];
+            [stack addArrangedSubview:SGPlanText(@"Individual", 32, UIFontWeightBold, SGPlanGreen())];
+            [stack setCustomSpacing:6 afterView:stack.arrangedSubviews.firstObject];
+            [stack setCustomSpacing:24 afterView:stack.arrangedSubviews.lastObject];
+            [stack addArrangedSubview:SGPlanText(@"1 Premium account", 16, UIFontWeightRegular, UIColor.lightGrayColor)];
+        } else if (indexPath.section == 1) {
+            [stack addArrangedSubview:SGPlanText(@"Payment", 22, UIFontWeightBold, UIColor.whiteColor)];
+            [stack addArrangedSubview:SGPlanText(@"Manage your Premium plan on web.", 18, UIFontWeightRegular, UIColor.lightGrayColor)];
+            [stack addArrangedSubview:[self outlineButton:@"View billing on Spotify" action:@selector(openAccount)]];
+        } else {
+            [stack addArrangedSubview:SGPlanText(@"Available plans and add-ons", 22, UIFontWeightBold, UIColor.whiteColor)];
+            [stack addArrangedSubview:[self managementLink:@"Browse add-ons · New" subtitle:@"Get more from your Premium experience." action:@selector(openAccount)]];
+            UIView *divider = [UIView new];
+            divider.backgroundColor = [UIColor colorWithWhite:0.25 alpha:1];
+            [divider.heightAnchor constraintEqualToConstant:1].active = YES;
+            [stack addArrangedSubview:divider];
+            [stack addArrangedSubview:[self managementLink:@"Explore plans" subtitle:@"Affordable options for any situation." action:@selector(exploreBenefits)]];
+        }
+    } else if (indexPath.section == 0) {
         UIView *tag = [UIView new];
         tag.backgroundColor = [UIColor colorWithWhite:0.20 alpha:1];
         tag.layer.cornerRadius = 8;
@@ -117,11 +174,10 @@ static UILabel *SGPlanText(NSString *text, CGFloat size, UIFontWeight weight, UI
             [tag.trailingAnchor constraintLessThanOrEqualToAnchor:card.trailingAnchor]
         ]];
         [stack addArrangedSubview:SGPlanText(@"Premium", 18, UIFontWeightBold, UIColor.whiteColor)];
-        UILabel *name = SGPlanText(@"Individual", 32, UIFontWeightBold, SGPlanGreen());
+        UILabel *name = SGPlanText(@"Individual", 28, UIFontWeightBold, SGPlanGreen());
         [stack addArrangedSubview:name];
-        [stack setCustomSpacing:6 afterView:stack.arrangedSubviews.firstObject];
-        [stack addArrangedSubview:SGPlanText(@"1 Premium account", 16, UIFontWeightRegular, UIColor.lightGrayColor)];
-        [stack setCustomSpacing:32 afterView:name];
+        [stack setCustomSpacing:0 afterView:stack.arrangedSubviews.firstObject];
+        [stack setCustomSpacing:16 afterView:name];
         UIStackView *actions = [UIStackView new];
         UIView *spacer = [UIView new];
         [actions addArrangedSubview:spacer];
@@ -151,7 +207,8 @@ static UILabel *SGPlanText(NSString *text, CGFloat size, UIFontWeight weight, UI
     return cell;
 }
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    return section == 1 ? @"Local plan preview, not your billing status. Benefits depend on your actual Spotify account; this page does not unlock server-side features. Manage opens your real account on Spotify’s website." : nil;
+    if (self.managing) return section == 2 ? @"You can’t make changes to your plan in the app. Open Spotify’s website for actual billing and subscription details. Individual is a local plan preview, not proof of a paid subscription." : nil;
+    return section == 1 ? @"Local plan preview, not your billing status. Benefits depend on your actual Spotify account; this page does not unlock server-side features. Manage shows a local overview; billing details are available on Spotify’s website." : nil;
 }
 @end
 
