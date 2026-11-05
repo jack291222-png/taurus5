@@ -534,3 +534,27 @@ bitrate access. All this behavior is shared by Native and Redesigned looks.
 The Individual settings row at the bottom of Spotify Settings and privacy has
 been removed in App/ModSettings.x, including its collection-view layout hook and
 extra bottom inset. Holding Home still calls SGOpenModSettings in either look.
+
+### Media-quality marker and initial badge loading
+
+The Very high marker matcher now uses the quality section plus row alignment,
+not the old <=120pt common-parent assumption. Spotify can put the option title
+and its trailing badge in separate branches under a tall list. A completed-page
+layout pass retries matching, and badge parts are rediscovered after layout so
+a late-added Spotify glyph is hidden with the word. Inline text-attachment glyphs
+are normalized for matching. Hidden parts are retained together for restoration
+when a label is reused. Neither selected quality nor server entitlements change.
+
+`ImmediatePlanBadge.x` adds a foreground NSURLProtocol handler for the exact
+Spotify GetYourPremiumBadge GET route, gated by Spoof Premium. It immediately
+supplies the deterministic Individual/version-2/green display protobuf, removing
+the network wait for that badge request instead of drawing a replacement pill.
+The wire values were rechecked against the fork's
+DynamicPremium+PremiumPlanRow.swift. Protocol injection is a Taurus adaptation,
+not a claim that the fork removes native skeleton animations. Existing protocols
+are preserved, background sessions are excluded, and plan-row, overview and
+billing requests are not short-circuited. Native loading animations or requests
+from sessions created before hook initialization can still need device tracing;
+this cannot be confirmed as eliminating every blurred frame without testing.
+The macOS fixture test covers the immediate data and endpoint exclusions; the
+NSURLProtocol/UIKit behavior still needs a full build and device verification.

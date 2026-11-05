@@ -72,3 +72,8 @@ NSData *SGPatchPlanResponse(NSURL *url, NSData *body) {
     }
     return SGPBSerialize(fields);
 }
+
+NSData *SGImmediatePlanBadge(NSURL *url) {
+    if (planKind(url) != 1) return nil;
+    return SGPatchPlanResponse(url, [NSData data]);
+}

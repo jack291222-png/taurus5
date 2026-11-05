@@ -29,6 +29,8 @@ static NSString *wordIn(UILabel *label) {
         if (attributed.length > 0 && attributed.length <= 16) text = attributed.string;
     }
     if (![text isKindOfClass:NSString.class]) return nil;
+    // Encore can encode the Spotify logo as an inline text attachment.
+    text = [text stringByReplacingOccurrencesOfString:@"\uFFFC" withString:@""];
     return [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
 }
 
@@ -58,10 +60,29 @@ static UIView *jamRowAround(UILabel *label) {
 
 // Media quality's Very high option can use an independent Premium label.
 // Match the option within one row, not the Premium branding on plan pages.
+static BOOL qualitySection(UIView *root) {
+    return holds(root, @"Media quality") || holds(root, @"Audio download quality")
+        || holds(root, @"Wi-Fi streaming quality") || holds(root, @"Cellular streaming quality");
+}
+
 static BOOL isVeryHighBadge(UILabel *label) {
-    for (UIView *row = label.superview; row; row = row.superview) {
-        if (CGRectGetHeight(row.bounds) > 120) break;
-        if (holds(row, @"Very high")) return YES;
+    for (UIView *root = label.superview; root && ![root isKindOfClass:UIWindow.class]; root = root.superview) {
+        if (!qualitySection(root)) continue;
+        // Encore may put the option and trailing badge in separate branches
+        // under one tall list. Compare their actual positions, not parent height.
+        CGRect badge = [label convertRect:label.bounds toView:root];
+        __block BOOL aligned = NO;
+        SGForEachView(root, ^(UIView *view) {
+            if (aligned || ![view isKindOfClass:UILabel.class]) return;
+            UILabel *option = (UILabel *)view;
+            if (!says(wordIn(option), @"Very high")) return;
+            CGRect frame = [option convertRect:option.bounds toView:root];
+            if (frame.size.height <= 0 || badge.size.height <= 0) return;
+            CGFloat tolerance = MAX(8, MIN(frame.size.height, badge.size.height) / 2);
+            aligned = fabs(CGRectGetMidY(frame) - CGRectGetMidY(badge)) <= tolerance
+                && CGRectGetMinX(badge) >= CGRectGetMaxX(frame) - 2;
+        });
+        if (aligned) return YES;
     }
     return NO;
 }
@@ -101,11 +122,12 @@ static NSArray<UIView *> *partsOfBadge(UILabel *label) {
 }
 
 static void hideBadge(UILabel *label) {
-    if (objc_getAssociatedObject(label, &kHidPartsKey)) return;
-    NSArray<UIView *> *parts = partsOfBadge(label);
+    // Re-evaluate after layout: the icon can be inserted after its text.
+    NSMutableArray<UIView *> *parts = [NSMutableArray arrayWithArray:objc_getAssociatedObject(label, &kHidPartsKey) ?: @[]];
+    for (UIView *part in partsOfBadge(label)) if (![parts containsObject:part]) [parts addObject:part];
     for (UIView *part in parts) part.alpha = 0;
     objc_setAssociatedObject(label, &kHidPartsKey, parts, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    SGLog(@"hid %lu part(s) of the Premium badge beside Jam", (unsigned long)parts.count);
+
 }
 
 static void showBadge(UILabel *label) {
@@ -128,7 +150,7 @@ static void settle(UILabel *label) {
 // that come once, so nothing here reads an attributed string on a layout pass.
 static BOOL watched(UILabel *label) {
     if (objc_getAssociatedObject(label, &kHidPartsKey) != nil) return YES;
-    return says([label.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet], @"Premium");
+    return says(wordIn(label), @"Premium");
 }
 
 // The mark itself, wherever Spotify puts one: alpha rather than hidden, for the reason above, and it takes no
@@ -179,6 +201,19 @@ static BOOL watched(UILabel *label) {
     %orig;
     if (self.text.length < 1 || self.text.length > 16 || !watched(self)) return;
     settle(self);
+}
+%end
+
+// Parent layouts can position the option after its badge label has laid out.
+// Retry from the completed page layout, including offscreen/reused option rows.
+%hook UIViewController
+- (void)viewDidLayoutSubviews {
+    %orig;
+    UIView *root = ((UIViewController *)self).viewIfLoaded;
+    if (!root || !qualitySection(root)) return;
+    SGForEachView(root, ^(UIView *view) {
+        if ([view isKindOfClass:UILabel.class] && watched((UILabel *)view)) settle((UILabel *)view);
+    });
 }
 %end
 

@@ -14,6 +14,13 @@ static NSArray<SGPBField *> *parse(NSData *data) {
 int main(void) {
     @autoreleasepool {
         NSURL *overview = endpoint(@"GetPlanOverview");
+        NSData *immediateBadge = SGImmediatePlanBadge(endpoint(@"GetYourPremiumBadge"));
+        NSCAssert(immediateBadge != nil, @"badge does not need server data");
+        NSCAssert([SGPBText(SGPBFirst(parse(immediateBadge), 1)) isEqualToString:@"Individual"], @"immediate badge name");
+        NSCAssert([SGPBText(SGPBFirst(parse(immediateBadge), 3)) isEqualToString:@"#1DB954"], @"immediate badge color");
+        NSCAssert(SGImmediatePlanBadge(overview) == nil, @"do not short circuit overview or native Manage actions");
+        NSCAssert(SGImmediatePlanBadge(endpoint(@"GetPremiumPlanRow")) == nil, @"do not short circuit row actions");
+        NSCAssert(SGImmediatePlanBadge([NSURL URLWithString:@"https://evilspotify.com/v1/GetYourPremiumBadge"]) == nil, @"immediate badge host boundary");
         NSCAssert(SGIsPlanResponseURL(overview), @"overview route");
         NSCAssert(!SGIsPlanResponseURL([NSURL URLWithString:@"https://evilspotify.com/v1/GetPlanOverview"]), @"host boundary");
         NSCAssert(!SGIsPlanResponseURL(endpoint(@"GetBilling")), @"billing must pass through");
