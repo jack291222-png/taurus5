@@ -1,7 +1,7 @@
 // The "Premium" badge out of the rows that sell a subscription beside something the mod already gives you: the
 // sheet Spotify opens for a new playlist (Playlist, Collaborative playlist, Blend, Jam) puts one on the Jam
-// row, Spotify's mark and the word, and Spoof Premium makes the row itself work, so the badge there is only a
-// sell. Hide upsells takes it out.
+// row, Spotify's mark and the word. Hide upsells removes the sales marker, not
+// a server-side entitlement. The Very high quality row uses the same treatment.
 //
 // Two ways, because the badge is drawn one of two ways: Spotify's own SPTPremiumBadgeView, wherever it appears
 // (the redesign's ⋯ takes that class out there; this is the one the rest of the app shows), and, for a badge
@@ -56,6 +56,24 @@ static UIView *jamRowAround(UILabel *label) {
     return nil;
 }
 
+// Media quality's Very high option can use an independent Premium label.
+// Match the option within one row, not the Premium branding on plan pages.
+static BOOL isVeryHighBadge(UILabel *label) {
+    for (UIView *row = label.superview; row; row = row.superview) {
+        if (CGRectGetHeight(row.bounds) > 120) break;
+        if (holds(row, @"Very high")) return YES;
+    }
+    return NO;
+}
+
+// Other Spotify versions put the marker into the option title itself.
+static NSString *qualityTitle(NSString *text) {
+    if (!text.length || text.length > 48) return nil;
+    NSRange match = [text rangeOfString:@"^Very high\\s*(?:[·•—–-]\\s*)?\\(?Premium\\)?$"
+                               options:NSRegularExpressionSearch | NSCaseInsensitiveSearch];
+    return match.location != NSNotFound ? [text substringToIndex:9] : nil;
+}
+
 // The mark beside the word: the small views on its line, just before it. Spotify's Encore label puts its words
 // in a UILabel of its own (id=...-internal, PlayerControls.x), so the word's line is asked for, and then the
 // line its own view is in; the row's title and its glyph are far wider than a mark, so they are left alone.
@@ -100,7 +118,7 @@ static void showBadge(UILabel *label) {
 // Once the label has a frame its row can be read: the word comes before the mark beside it has one, and a row
 // reused for another one is laid out again with the word still in it.
 static void settle(UILabel *label) {
-    BOOL badge = says(wordIn(label), @"Premium") && CGRectGetWidth(label.bounds) >= 1 && jamRowAround(label);
+    BOOL badge = says(wordIn(label), @"Premium") && CGRectGetWidth(label.bounds) >= 1 && (jamRowAround(label) || isVeryHighBadge(label));
     if (badge) hideBadge(label);
     else showBadge(label);
 }
@@ -132,13 +150,19 @@ static BOOL watched(UILabel *label) {
 
 %hook UILabel
 - (void)setText:(NSString *)text {
-    %orig;
+    NSString *clean = qualityTitle(text);
+    %orig(clean ?: text);
     if (text.length < 1 || text.length > 16 || !watched(self)) return;
     settle(self);
 }
 
 - (void)setAttributedText:(NSAttributedString *)text {
-    %orig;
+    NSString *clean = qualityTitle(text.string);
+    if (clean) {
+        %orig([text attributedSubstringFromRange:NSMakeRange(0, clean.length)]);
+    } else {
+        %orig;
+    }
     if (text.length < 1 || text.length > 16) return;
     if (!watched(self) && !says(wordIn(self), @"Premium")) return;
     settle(self);
