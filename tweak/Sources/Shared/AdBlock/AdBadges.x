@@ -1,7 +1,8 @@
 // The "Premium" badge out of the rows that sell a subscription beside something the mod already gives you: the
 // sheet Spotify opens for a new playlist (Playlist, Collaborative playlist, Blend, Jam) puts one on the Jam
 // row, Spotify's mark and the word. Hide upsells removes the sales marker, not
-// a server-side entitlement. The Very high quality row uses the same treatment.
+// a server-side entitlement. The Very high quality row and Connect sheet
+// Start a Jam tag use the same treatment.
 //
 // Two ways, because the badge is drawn one of two ways: Spotify's own SPTPremiumBadgeView, wherever it appears
 // (the redesign's ⋯ takes that class out there; this is the one the rest of the app shows), and, for a badge
@@ -54,6 +55,36 @@ static UIView *jamRowAround(UILabel *label) {
     for (int depth = 0; row && depth < 6; depth++, row = row.superview) {
         if (row == label || CGRectGetHeight(row.bounds) > 120) break;
         if (holds(row, @"Jam")) return row;
+    }
+    return nil;
+}
+
+// Connect uses "Start a Jam", with the Premium tag above the button rather
+// than beside a "Jam" row. Locate it by the observed sheet texts and geometry;
+// do not assume a private Connect/badge class or hide the footer itself.
+static UIView *connectJamBadge(UILabel *label) {
+    for (UIView *root = label.superview; root && ![root isKindOfClass:UIWindow.class]; root = root.superview) {
+        if (!holds(root, @"Start a Jam") ||
+            !(holds(root, @"Connect") || holds(root, @"Bluetooth & Airplay"))) continue;
+        CGRect badge = [label convertRect:label.bounds toView:root];
+        __block BOOL nearJam = NO;
+        SGForEachView(root, ^(UIView *view) {
+            if (![view isKindOfClass:UILabel.class] || !says(wordIn((UILabel *)view), @"Start a Jam")) return;
+            CGRect title = [view convertRect:view.bounds toView:root];
+            // The tag sits at the upper-left of the Jam tile, above its title.
+            nearJam = nearJam || (CGRectGetMidY(badge) >= CGRectGetMinY(title) - 100 &&
+                CGRectGetMaxY(badge) <= CGRectGetMinY(title) + 4 &&
+                CGRectGetMinX(badge) < CGRectGetMaxX(title) &&
+                CGRectGetMaxX(badge) > CGRectGetMinX(title) - 100);
+        });
+        if (!nearJam) continue;
+        UIView *surface = label;
+        for (UIView *parent = label.superview; parent && parent != root; parent = parent.superview) {
+            if (parent.bounds.size.height > 48 || parent.bounds.size.width > 180) break;
+            if (holds(parent, @"Start a Jam")) break;
+            surface = parent;
+        }
+        return surface;
     }
     return nil;
 }
@@ -121,9 +152,10 @@ static NSArray<UIView *> *partsOfBadge(UILabel *label) {
     return parts;
 }
 
-static void hideBadge(UILabel *label) {
+static void hideBadge(UILabel *label, UIView *surface) {
     // Re-evaluate after layout: the icon can be inserted after its text.
     NSMutableArray<UIView *> *parts = [NSMutableArray arrayWithArray:objc_getAssociatedObject(label, &kHidPartsKey) ?: @[]];
+    if (surface && ![parts containsObject:surface]) [parts addObject:surface];
     for (UIView *part in partsOfBadge(label)) if (![parts containsObject:part]) [parts addObject:part];
     for (UIView *part in parts) part.alpha = 0;
     objc_setAssociatedObject(label, &kHidPartsKey, parts, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -140,8 +172,13 @@ static void showBadge(UILabel *label) {
 // Once the label has a frame its row can be read: the word comes before the mark beside it has one, and a row
 // reused for another one is laid out again with the word still in it.
 static void settle(UILabel *label) {
-    BOOL badge = says(wordIn(label), @"Premium") && CGRectGetWidth(label.bounds) >= 1 && (jamRowAround(label) || isVeryHighBadge(label));
-    if (badge) hideBadge(label);
+    if (!says(wordIn(label), @"Premium") || CGRectGetWidth(label.bounds) < 1) {
+        showBadge(label);
+        return;
+    }
+    UIView *connectSurface = connectJamBadge(label);
+    BOOL badge = connectSurface || jamRowAround(label) || isVeryHighBadge(label);
+    if (badge) hideBadge(label, connectSurface);
     else showBadge(label);
 }
 
@@ -205,12 +242,15 @@ static BOOL watched(UILabel *label) {
 %end
 
 // Parent layouts can position the option after its badge label has laid out.
-// Retry from the completed page layout, including offscreen/reused option rows.
+// Retry from completed quality-page and Connect-sheet layouts, including reused labels.
 %hook UIViewController
 - (void)viewDidLayoutSubviews {
     %orig;
     UIView *root = ((UIViewController *)self).viewIfLoaded;
-    if (!root || !qualitySection(root)) return;
+    if (!root) return;
+    BOOL connect = holds(root, @"Start a Jam") &&
+        (holds(root, @"Connect") || holds(root, @"Bluetooth & Airplay"));
+    if (!connect && !qualitySection(root)) return;
     SGForEachView(root, ^(UIView *view) {
         if ([view isKindOfClass:UILabel.class] && watched((UILabel *)view)) settle((UILabel *)view);
     });

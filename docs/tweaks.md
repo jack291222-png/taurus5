@@ -579,3 +579,17 @@ replacement overlay is drawn, and no animations are globally disabled. This
 closes a response-coverage gap, but is not evidence that the native drawer's
 blur/skeleton animation is gone on-device. The actual transport and rendering
 path still need device validation; macOS fixture tests do not cover UIKit.
+
+### Connect sheet Start a Jam tag
+
+AdBadges.x also handles the screenshot's Start a Jam footer tag in the Connect
+sheet opened from the mini-player headphones/device button. It requires Start
+a Jam plus Connect or Bluetooth & Airplay in the same ancestor, then checks that
+the Premium label is just above the Jam title. The compact badge surface is
+alpha-zeroed with the text/logo so its outline disappears without hiding either
+footer button or changing stack layout. Hidden parts are restored on label reuse.
+The page-layout retry includes Connect so a tag laid out after its label is
+handled. Hide upsells must be enabled at launch. English text and screenshot
+geometry are fallback identification, not a verified private Spotify class;
+localized or substantially changed Connect layouts require device inspection.
+This is cosmetic only; Jam behavior and server-side authorization are unchanged.
