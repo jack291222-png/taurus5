@@ -15,11 +15,12 @@
 // and its glyph stay.
 #import "Core/SGCore.h"
 #import "AdBlock.h"
+#import "BadgeMatching.h"
 
 @interface SPTPremiumBadgeView : UIView
 @end
 
-static char kHidPartsKey;
+static char kHidPartsKey, kSuppressedPartKey;
 
 // The word a label says, plain or attributed. Attributed text is only asked for when there is no plain text and
 // it is short enough to be this word, because reading it builds a string.
@@ -29,21 +30,21 @@ static NSString *wordIn(UILabel *label) {
         NSAttributedString *attributed = label.attributedText;
         if (attributed.length > 0 && attributed.length <= 16) text = attributed.string;
     }
-    if (![text isKindOfClass:NSString.class]) return nil;
-    // Encore can encode the Spotify logo as an inline text attachment.
-    text = [text stringByReplacingOccurrencesOfString:@"\uFFFC" withString:@""];
-    return [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    return SGAdBadgeNormalizedText(text);
 }
 
 static BOOL says(NSString *text, NSString *word) {
+    text = SGAdBadgeNormalizedText(text);
     return text.length > 0 && text.length < 24 && [text caseInsensitiveCompare:word] == NSOrderedSame;
 }
 
 static BOOL holds(UIView *root, NSString *word) {
     __block BOOL found = NO;
     SGForEachView(root, ^(UIView *view) {
-        if (found || ![view isKindOfClass:UILabel.class]) return;
-        if (says(wordIn((UILabel *)view), word)) found = YES;
+        if (found) return;
+        if ([view isKindOfClass:UILabel.class] && says(wordIn((UILabel *)view), word)) found = YES;
+        if (says(view.accessibilityLabel, word)) found = YES;
+        if ([view isKindOfClass:UIButton.class] && says(((UIButton *)view).currentTitle, word)) found = YES;
     });
     return found;
 }
@@ -62,20 +63,20 @@ static UIView *jamRowAround(UILabel *label) {
 // Connect uses "Start a Jam", with the Premium tag above the button rather
 // than beside a "Jam" row. Locate it by the observed sheet texts and geometry;
 // do not assume a private Connect/badge class or hide the footer itself.
-static UIView *connectJamBadge(UILabel *label) {
+static UIView *connectJamBadge(UIView *label) {
     for (UIView *root = label.superview; root && ![root isKindOfClass:UIWindow.class]; root = root.superview) {
         if (!holds(root, @"Start a Jam") ||
             !(holds(root, @"Connect") || holds(root, @"Bluetooth & Airplay"))) continue;
         CGRect badge = [label convertRect:label.bounds toView:root];
         __block BOOL nearJam = NO;
         SGForEachView(root, ^(UIView *view) {
-            if (![view isKindOfClass:UILabel.class] || !says(wordIn((UILabel *)view), @"Start a Jam")) return;
+            BOOL jam = [view isKindOfClass:UILabel.class] && says(wordIn((UILabel *)view), @"Start a Jam");
+            jam = jam || says(view.accessibilityLabel, @"Start a Jam");
+            if ([view isKindOfClass:UIButton.class]) jam = jam || says(((UIButton *)view).currentTitle, @"Start a Jam");
+            if (!jam) return;
             CGRect title = [view convertRect:view.bounds toView:root];
             // The tag sits at the upper-left of the Jam tile, above its title.
-            nearJam = nearJam || (CGRectGetMidY(badge) >= CGRectGetMinY(title) - 100 &&
-                CGRectGetMaxY(badge) <= CGRectGetMinY(title) + 4 &&
-                CGRectGetMinX(badge) < CGRectGetMaxX(title) &&
-                CGRectGetMaxX(badge) > CGRectGetMinX(title) - 100);
+            nearJam = nearJam || SGConnectBadgeAboveJam(badge, title);
         });
         if (!nearJam) continue;
         UIView *surface = label;
@@ -152,21 +153,34 @@ static NSArray<UIView *> *partsOfBadge(UILabel *label) {
     return parts;
 }
 
-static void hideBadge(UILabel *label, UIView *surface) {
-    // Re-evaluate after layout: the icon can be inserted after its text.
-    NSMutableArray<UIView *> *parts = [NSMutableArray arrayWithArray:objc_getAssociatedObject(label, &kHidPartsKey) ?: @[]];
-    if (surface && ![parts containsObject:surface]) [parts addObject:surface];
-    for (UIView *part in partsOfBadge(label)) if (![parts containsObject:part]) [parts addObject:part];
-    for (UIView *part in parts) part.alpha = 0;
-    objc_setAssociatedObject(label, &kHidPartsKey, parts, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-
+static void hideBadge(UIView *owner, UIView *surface) {
+    // Weak references are essential: a compact surface can contain the owner.
+    // Retaining that ancestor from its own label would create a retain cycle.
+    NSHashTable<UIView *> *parts = objc_getAssociatedObject(owner, &kHidPartsKey);
+    if (!parts) {
+        if (surface) SGLog(@"suppressed Connect Jam Premium tag: %@", NSStringFromClass(surface.class));
+        parts = [NSHashTable weakObjectsHashTable];
+        objc_setAssociatedObject(owner, &kHidPartsKey, parts, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (surface) [parts addObject:surface];
+    [parts addObject:owner];
+    if ([owner isKindOfClass:UILabel.class]) {
+        for (UIView *part in partsOfBadge((UILabel *)owner)) [parts addObject:part];
+    }
+    for (UIView *part in parts.allObjects) {
+        objc_setAssociatedObject(part, &kSuppressedPartKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        part.alpha = 0;
+    }
 }
 
-static void showBadge(UILabel *label) {
-    NSArray<UIView *> *parts = objc_getAssociatedObject(label, &kHidPartsKey);
+static void showBadge(UIView *owner) {
+    NSHashTable<UIView *> *parts = objc_getAssociatedObject(owner, &kHidPartsKey);
     if (!parts) return;
-    for (UIView *part in parts) if (part.alpha == 0) part.alpha = 1;
-    objc_setAssociatedObject(label, &kHidPartsKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    for (UIView *part in parts.allObjects) {
+        objc_setAssociatedObject(part, &kSuppressedPartKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        if (part.alpha == 0) part.alpha = 1;
+    }
+    objc_setAssociatedObject(owner, &kHidPartsKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 // Once the label has a frame its row can be read: the word comes before the mark beside it has one, and a row
@@ -193,6 +207,18 @@ static BOOL watched(UILabel *label) {
 // The mark itself, wherever Spotify puts one: alpha rather than hidden, for the reason above, and it takes no
 // touch, so a row it sat in still does what it says. (ContextMenu.x hooks its -didMoveToSuperview for the
 // redesign; this leaves that method to it.)
+// Spotify can set the compact tag's opacity after layout/appearance. Keep only
+// explicitly matched parts suppressed until showBadge releases them on reuse.
+%hook UIView
+- (void)setAlpha:(CGFloat)alpha {
+    %orig(objc_getAssociatedObject(self, &kSuppressedPartKey) ? 0 : alpha);
+}
+- (void)didMoveToWindow {
+    %orig;
+    if (!self.window && objc_getAssociatedObject(self, &kHidPartsKey)) showBadge(self);
+}
+%end
+
 %hook SPTPremiumBadgeView
 - (void)didMoveToWindow {
     %orig;
@@ -252,7 +278,25 @@ static BOOL watched(UILabel *label) {
         (holds(root, @"Connect") || holds(root, @"Bluetooth & Airplay"));
     if (!connect && !qualitySection(root)) return;
     SGForEachView(root, ^(UIView *view) {
-        if ([view isKindOfClass:UILabel.class] && watched((UILabel *)view)) settle((UILabel *)view);
+        if ([view isKindOfClass:UILabel.class]) {
+            if (watched((UILabel *)view)) settle((UILabel *)view);
+            return;
+        }
+        // Some Encore tags expose text through accessibility/button titles,
+        // not an inner UILabel. Match that public surface without class guesses.
+        if (!connect) return;
+        BOOL premium = says(view.accessibilityLabel, @"Premium");
+        if ([view isKindOfClass:UIButton.class]) premium = premium || says(((UIButton *)view).currentTitle, @"Premium");
+        if (!premium && !objc_getAssociatedObject(view, &kHidPartsKey)) return;
+        // Leave label-backed tags to the label path to avoid two hide owners.
+        __block BOOL innerLabel = NO;
+        SGForEachView(view, ^(UIView *child) {
+            if ([child isKindOfClass:UILabel.class] && says(wordIn((UILabel *)child), @"Premium")) innerLabel = YES;
+        });
+        if (innerLabel) return;
+        UIView *surface = premium ? connectJamBadge(view) : nil;
+        if (surface) hideBadge(view, surface);
+        else if (objc_getAssociatedObject(view, &kHidPartsKey)) showBadge(view);
     });
 }
 %end

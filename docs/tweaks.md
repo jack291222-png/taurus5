@@ -593,3 +593,18 @@ handled. Hide upsells must be enabled at launch. English text and screenshot
 geometry are fallback identification, not a verified private Spotify class;
 localized or substantially changed Connect layouts require device inspection.
 This is cosmetic only; Jam behavior and server-side authorization are unchanged.
+
+Connect badge follow-up: title matching now normalizes wrapped whitespace for
+labels, button titles and accessibility labels (for example Start a / Jam and
+Bluetooth & / Airplay). Exact matching of the unnormalized strings could miss
+these layouts. Accessibility-only Premium surfaces are also inspected during
+completed page layout. Explicitly matched badge parts retain an alpha-zero mark
+so Spotify cannot restore their opacity after our layout pass; reuse clears the
+mark. The hidden-parts registry is weak to avoid retaining an ancestor from its
+own child label. A once-per-owner log records a matched Connect tag for diagnosis.
+
+`sh scripts/test-connect-badge.sh` exercises the actual normalization and geometry
+helpers on macOS, including wrapped titles, inline logos, and negative matches
+for neighboring/distant cards. The existing PR test workflow now runs it too.
+These tests do not simulate Spotify's UIKit hierarchy, its rendered outline, or
+reuse behavior: a full iOS build and Connect-sheet device check remain required.
