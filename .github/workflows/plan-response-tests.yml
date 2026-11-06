@@ -4,6 +4,10 @@ on:
     paths:
       - 'tweak/Sources/Shared/AdBlock/PlanResponses.*'
       - 'tweak/Sources/Shared/AdBlock/Protobuf.*'
+      - 'tweak/Sources/Shared/AdBlock/AdBadges.x'
+      - 'tweak/Sources/Shared/AdBlock/BadgeMatching.h'
+      - 'tests/connect-badge/**'
+      - 'scripts/test-connect-badge.sh'
       - 'tests/plan-responses/**'
       - 'scripts/test-plan-responses.sh'
       - '.github/workflows/plan-response-tests.yml'
@@ -17,3 +21,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sh scripts/test-plan-responses.sh
+      - run: sh scripts/test-connect-badge.sh
