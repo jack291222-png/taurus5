@@ -608,3 +608,13 @@ helpers on macOS, including wrapped titles, inline logos, and negative matches
 for neighboring/distant cards. The existing PR test workflow now runs it too.
 These tests do not simulate Spotify's UIKit hierarchy, its rendered outline, or
 reuse behavior: a full iOS build and Connect-sheet device check remain required.
+
+### Song-menu Jam badge
+
+The experimental Jam-entry flag change was undone; the prior enabled setting
+is retained. AdBadges.x now recognizes Start a Jam as well as Jam inside a
+compact row, removing the trailing Premium label and adjacent Spotify glyph
+from the song overflow menu without changing the row action, geometry, or
+other subscription branding. Hide upsells must be enabled and Spotify restarted.
+Native and Redesigned both use this shared behavior. Device validation remains
+required; this text-based fallback is restricted to the observed English rows.

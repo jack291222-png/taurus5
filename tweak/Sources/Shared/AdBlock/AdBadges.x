@@ -55,7 +55,9 @@ static UIView *jamRowAround(UILabel *label) {
     UIView *row = label.superview;
     for (int depth = 0; row && depth < 6; depth++, row = row.superview) {
         if (row == label || CGRectGetHeight(row.bounds) > 120) break;
-        if (holds(row, @"Jam")) return row;
+        // Create calls this Jam; song overflow menus call it Start a Jam.
+        // Keep the match inside one compact row so plan-page branding stays.
+        if (holds(row, @"Jam") || holds(row, @"Start a Jam")) return row;
     }
     return nil;
 }
